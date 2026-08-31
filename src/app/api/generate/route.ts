@@ -7,13 +7,12 @@ const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! })
 
 export async function POST(req: Request) {
   try {
-    const { prompt, aspectRatio, imageUrl, enableAudio } = await req.json()
+    const { prompt, aspectRatio, imageUrl, enableAudio, style } = await req.json()
 
     if (!prompt && !imageUrl) {
       return NextResponse.json({ error: 'Sila masukkan prompt teks atau muat naik gambar!' }, { status: 400 })
     }
 
-    // 1. Optimasi Prompt menggunakan Gemini API (dengan fallback)
     let enhancedPrompt = prompt || 'Animate this image with smooth cinematic movement and realistic motion'
 
     try {
@@ -23,7 +22,7 @@ export async function POST(req: Request) {
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Enhance this prompt for AI video generation (cinematic, highly detailed, photorealistic).${audioInstruction} User prompt: "${enhancedPrompt}"`,
+        contents: `Enhance this prompt for AI video generation with visual style "${style || 'Cinematic'}". Make it photorealistic, highly detailed, and engaging.${audioInstruction} User prompt: "${enhancedPrompt}"`,
       })
 
       if (response.text) {
@@ -33,18 +32,15 @@ export async function POST(req: Request) {
       console.warn('Optimasi Gemini dilepaskan, menggunakan prompt asal:', geminiError)
     }
 
-    // 2. Sediakan parameter input Replicate (Minimax Video Model)
     const inputPayload: Record<string, any> = {
       prompt: enhancedPrompt,
       aspect_ratio: aspectRatio || '16:9',
     }
 
-    // Jika pengguna muat naik gambar (Image-to-Video)
     if (imageUrl) {
       inputPayload.first_frame_image = imageUrl
     }
 
-    // 3. Hantar arahan ke Replicate
     const prediction = await replicate.predictions.create({
       model: "minimax/video-01",
       input: inputPayload,
