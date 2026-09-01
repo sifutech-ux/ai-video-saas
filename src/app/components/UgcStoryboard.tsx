@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 interface Scene {
   sceneNumber: number
@@ -28,9 +28,28 @@ export default function UgcStoryboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [scriptData, setScriptData] = useState<ScriptData | null>(null)
 
+  // State Gambar Rujukan (Avatar & Produk)
+  const [avatarImage, setAvatarImage] = useState<string | null>(null)
+  const [productImage, setProductImage] = useState<string | null>(null)
+
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const productInputRef = useRef<HTMLInputElement>(null)
+
   const [sceneStates, setSceneStates] = useState<{ [key: number]: SceneState }>({})
   const [stitchedVideo, setStitchedVideo] = useState('')
   const [isStitching, setIsStitching] = useState(false)
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'product') => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        if (type === 'avatar') setAvatarImage(reader.result as string)
+        else setProductImage(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleGenerateScript = async () => {
     if (!productName || !productBenefits) {
@@ -56,7 +75,6 @@ export default function UgcStoryboard() {
     }
   }
 
-  // Pradengar suara manusia realistik Azure Neural via API /api/tts
   const handlePlayAudio = async (text: string, type: string) => {
     try {
       const res = await fetch('/api/tts', {
@@ -113,13 +131,17 @@ export default function UgcStoryboard() {
       [scene.sceneNumber]: { isGenerating: true, status: '🧠 Menghantar ke AI...', url: '' },
     }))
 
+    // Memilih gambar rujukan mengikut kategori adegan
+    const selectedImage = scene.type === 'avatar' ? avatarImage : productImage
+
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `${scene.visualPrompt}. Voice dialogue audio: ${scene.scriptMalay}`,
+          prompt: scene.visualPrompt,
           aspectRatio: '9:16',
+          imageUrl: selectedImage,
           enableAudio: true,
           style: 'Photorealistic',
         }),
@@ -143,7 +165,6 @@ export default function UgcStoryboard() {
     }
   }
 
-  // Dihantar berurutan dengan sela masa 3.5 saat (elak 429 rate limit)
   const handleGenerateAllScenes = async () => {
     if (!scriptData) return
 
@@ -156,7 +177,6 @@ export default function UgcStoryboard() {
     }
   }
 
-  // Hantar klip video & skrip adegan ke backend untuk dimasukkan audio percakapan & dicantumkan
   const handleStitchVideos = async () => {
     if (!scriptData) return
 
@@ -199,10 +219,56 @@ export default function UgcStoryboard() {
           ✨ UGC Script & Storyboard Generator
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Bina skrip iklan TikTok/Reels 4-adegan, jana klip video, dan cantumkan menjadi 1 video iklan lengkap.
+          Muat naik gambar rujukan orang & produk untuk menghasilkan video AI yang konsisten dan realistik.
         </p>
       </div>
 
+      {/* Bahagian Muat Naik Gambar Rujukan */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950 p-4 border border-slate-800 rounded-xl">
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold text-purple-400 flex justify-between">
+            <span>👩🏻 Gambar Avatar / Model (Opsional)</span>
+            {avatarImage && (
+              <button onClick={() => setAvatarImage(null)} className="text-[10px] text-red-400 hover:underline">Padam</button>
+            )}
+          </label>
+          <input type="file" accept="image/*" ref={avatarInputRef} onChange={(e) => handleImageUpload(e, 'avatar')} className="hidden" />
+          {!avatarImage ? (
+            <div
+              onClick={() => avatarInputRef.current?.click()}
+              className="border border-dashed border-slate-800 hover:border-purple-500 p-3 rounded-xl cursor-pointer text-center bg-slate-900 transition"
+            >
+              <span className="text-base block mb-1">👤</span>
+              <p className="text-xs text-slate-400">Muat naik gambar rujukan muka/orang</p>
+            </div>
+          ) : (
+            <img src={avatarImage} alt="Avatar" className="w-full h-24 object-cover rounded-lg border border-purple-500" />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold text-pink-400 flex justify-between">
+            <span>📦 Gambar Produk (Opsional)</span>
+            {productImage && (
+              <button onClick={() => setProductImage(null)} className="text-[10px] text-red-400 hover:underline">Padam</button>
+            )}
+          </label>
+          <input type="file" accept="image/*" ref={productInputRef} onChange={(e) => handleImageUpload(e, 'product')} className="hidden" />
+          {!productImage ? (
+            <div
+              onClick={() => productInputRef.current?.click()}
+              className="border border-dashed border-slate-800 hover:border-pink-500 p-3 rounded-xl cursor-pointer text-center bg-slate-900 transition"
+            >
+              <span className="text-base block mb-1">🎁</span>
+              <p className="text-xs text-slate-400">Muat naik gambar rujukan produk/pek</p>
+            </div>
+          ) : (
+            <img src={productImage} alt="Produk" className="w-full h-24 object-cover rounded-lg border border-pink-500" />
+          )}
+        </div>
+      </div>
+
+      {/* Form Input Maklumat Produk */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-medium text-slate-300 mb-1">Nama Produk *</label>
