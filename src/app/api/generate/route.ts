@@ -13,16 +13,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Sila masukkan prompt teks atau muat naik gambar!' }, { status: 400 })
     }
 
-    let enhancedPrompt = prompt || 'Animate this image with smooth cinematic movement and realistic motion'
+    let enhancedPrompt = prompt || 'Animate this image smoothly with realistic motion, natural head movement, and eye blinking'
 
     try {
       const audioInstruction = enableAudio
-        ? ' Include immersive sound effect descriptions and auditory atmosphere.'
+        ? ' Include immersive realistic motion suited for video advertising.'
         : ''
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Enhance this prompt for AI video generation with visual style "${style || 'Cinematic'}". Make it photorealistic, highly detailed, and engaging.${audioInstruction} User prompt: "${enhancedPrompt}"`,
+        model: 'gemini-3.6-flash',
+        contents: `Enhance this prompt for AI image animation / video generation with style "${style || 'Photorealistic'}". Ensure realistic facial motions, smooth movements, high detail, no distortion, no morphing.${audioInstruction} User prompt: "${enhancedPrompt}"`,
       })
 
       if (response.text) {
@@ -34,9 +34,11 @@ export async function POST(req: Request) {
 
     const inputPayload: Record<string, any> = {
       prompt: enhancedPrompt,
-      aspect_ratio: aspectRatio || '16:9',
+      aspect_ratio: aspectRatio || '9:16',
+      prompt_optimizer: true,
     }
 
+    // Jika gambar rujukan disediakan, masukkan ke first_frame_image
     if (imageUrl) {
       inputPayload.first_frame_image = imageUrl
     }
@@ -54,6 +56,7 @@ export async function POST(req: Request) {
     })
 
   } catch (error: any) {
+    console.error('Ralat API Generate:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
