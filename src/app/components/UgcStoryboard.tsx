@@ -55,6 +55,25 @@ export default function UgcStoryboard() {
     }
   }
 
+  const handlePlayAudio = async (text: string) => {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      const data = await res.json()
+      if (data.audioUrl) {
+        const audio = new Audio(data.audioUrl)
+        audio.play()
+      } else {
+        alert('Gagal mendapatkan fail audio.')
+      }
+    } catch (err) {
+      alert('Ralat memainkan audio suara.')
+    }
+  }
+
   const pollSceneStatus = async (jobId: string, sceneNumber: number) => {
     const interval = setInterval(async () => {
       try {
@@ -195,7 +214,16 @@ export default function UgcStoryboard() {
                       </span>
                     </div>
                     <div>
-                      <p className="text-[11px] text-slate-400 font-medium mb-0.5">Skrip Audio (BM):</p>
+                      <div className="flex justify-between items-center mb-0.5">
+                        <p className="text-[11px] text-slate-400 font-medium">Skrip Audio (BM):</p>
+                        <button
+                          type="button"
+                          onClick={() => handlePlayAudio(scene.scriptMalay)}
+                          className="text-[10px] bg-purple-950/60 hover:bg-purple-800 text-purple-300 border border-purple-700 px-2 py-0.5 rounded transition flex items-center gap-1"
+                        >
+                          🔊 Dengar Suara
+                        </button>
+                      </div>
                       <p className="text-xs text-slate-200 italic bg-slate-900 p-2 rounded-lg border border-slate-800/80">"{scene.scriptMalay}"</p>
                     </div>
                     <div>
