@@ -141,6 +141,16 @@ export default function UgcStoryboard() {
     }
   }
 
+  const handleGenerateAllScenes = async () => {
+    if (!scriptData) return
+    scriptData.scenes.forEach((scene) => {
+      const currentState = sceneStates[scene.sceneNumber]
+      if (!currentState?.url && !currentState?.isGenerating) {
+        handleGenerateSceneVideo(scene)
+      }
+    })
+  }
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-6 text-slate-100">
       <div>
@@ -199,7 +209,20 @@ export default function UgcStoryboard() {
       {/* Paparan Storyboard 4-Adegan */}
       {scriptData && (
         <div className="flex flex-col gap-4 mt-2">
-          <h3 className="text-sm font-bold text-amber-400">📋 {scriptData.title}</h3>
+          {/* Header Papan Cerita & Butang Batch Generation */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-950 p-4 border border-slate-800 rounded-xl gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-amber-400">📋 {scriptData.title}</h3>
+              <p className="text-[11px] text-slate-400">4 adegan sedia untuk dijana menjadi video.</p>
+            </div>
+            <button
+              onClick={handleGenerateAllScenes}
+              className="py-2 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs rounded-xl transition shadow-lg flex items-center gap-2"
+            >
+              🚀 Jana Kesemua 4 Klip (4 Kredit)
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {scriptData.scenes.map((scene) => {
               const state = sceneStates[scene.sceneNumber] || { isGenerating: false, status: '', url: '' }
@@ -213,6 +236,7 @@ export default function UgcStoryboard() {
                         {scene.type === 'avatar' ? '🗣️ Avatar' : '📹 B-Roll'}
                       </span>
                     </div>
+
                     <div>
                       <div className="flex justify-between items-center mb-0.5">
                         <p className="text-[11px] text-slate-400 font-medium">Skrip Audio (BM):</p>
@@ -226,6 +250,7 @@ export default function UgcStoryboard() {
                       </div>
                       <p className="text-xs text-slate-200 italic bg-slate-900 p-2 rounded-lg border border-slate-800/80">"{scene.scriptMalay}"</p>
                     </div>
+
                     <div>
                       <p className="text-[11px] text-slate-400 font-medium mb-0.5">Prompt Visual (AI Video):</p>
                       <p className="text-[11px] text-slate-400 bg-slate-900 p-2 rounded-lg border border-slate-800/80">{scene.visualPrompt}</p>
