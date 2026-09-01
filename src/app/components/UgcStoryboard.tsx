@@ -31,6 +31,10 @@ export default function UgcStoryboard() {
   // Rekod status penjanaan video bagi setiap adegan (Scene 1-4)
   const [sceneStates, setSceneStates] = useState<{ [key: number]: SceneState }>({})
 
+  // State untuk pencantum video akhir
+  const [stitchedVideo, setStitchedVideo] = useState('')
+  const [isStitching, setIsStitching] = useState(false)
+
   const handleGenerateScript = async () => {
     if (!productName || !productBenefits) {
       return alert('Sila masukkan Nama Produk dan Kelebihan Utama!')
@@ -117,7 +121,7 @@ export default function UgcStoryboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: `${scene.visualPrompt}. Voice dialogue audio: ${scene.scriptMalay}`,
-          aspectRatio: '9:16', // Format menegak khas TikTok/Reels
+          aspectRatio: '9:16',
           enableAudio: true,
           style: 'Photorealistic',
         }),
@@ -151,6 +155,35 @@ export default function UgcStoryboard() {
     })
   }
 
+  const handleStitchVideos = async () => {
+    const urls = Object.values(sceneStates)
+      .map((s) => s.url)
+      .filter(Boolean)
+
+    if (urls.length < 2) {
+      return alert('Sila jana sekurang-kurangnya 2 adegan sebelum mencantumkan video!')
+    }
+
+    setIsStitching(true)
+    try {
+      const res = await fetch('/api/stitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrls: urls }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Gagal mencantumkan video')
+
+      setStitchedVideo(data.stitchedVideoUrl)
+    } catch (err: any) {
+      alert(`Ralat cantum video: ${err.message}`)
+    } finally {
+      setIsStitching(false)
+    }
+  }
+
+  const completedCount = Object.values(sceneStates).filter((s) => s.url).length
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-6 text-slate-100">
       <div>
@@ -158,7 +191,7 @@ export default function UgcStoryboard() {
           ✨ UGC Script & Storyboard Generator
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Bina skrip iklan TikTok/Reels 4-adegan & jana klip video berasingan secara automatik.
+          Bina skrip iklan TikTok/Reels 4-adegan, jana klip video, dan cantumkan menjadi 1 video iklan lengkap.
         </p>
       </div>
 
@@ -209,18 +242,32 @@ export default function UgcStoryboard() {
       {/* Paparan Storyboard 4-Adegan */}
       {scriptData && (
         <div className="flex flex-col gap-4 mt-2">
-          {/* Header Papan Cerita & Butang Batch Generation */}
+          {/* Header Papan Cerita & Butang Tindakan */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-950 p-4 border border-slate-800 rounded-xl gap-3">
             <div>
               <h3 className="text-sm font-bold text-amber-400">📋 {scriptData.title}</h3>
-              <p className="text-[11px] text-slate-400">4 adegan sedia untuk dijana menjadi video.</p>
+              <p className="text-[11px] text-slate-400">
+                {completedCount}/4 adegan sedia.
+              </p>
             </div>
-            <button
-              onClick={handleGenerateAllScenes}
-              className="py-2 px-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs rounded-xl transition shadow-lg flex items-center gap-2"
-            >
-              🚀 Jana Kesemua 4 Klip (4 Kredit)
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleGenerateAllScenes}
+                className="py-2 px-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs rounded-xl transition shadow-lg"
+              >
+                🚀 Jana Kesemua 4 Klip
+              </button>
+
+              {completedCount >= 2 && (
+                <button
+                  onClick={handleStitchVideos}
+                  disabled={isStitching}
+                  className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-lg disabled:opacity-50"
+                >
+                  {isStitching ? '🔄 Mencantumkan...' : '🎞️ Cantumkan Klip Menjadi 1 Video'}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -257,7 +304,7 @@ export default function UgcStoryboard() {
                     </div>
                   </div>
 
-                  {/* Paparan Pemain Video / Butang Jana */}
+                  {/* Pemain Video / Butang Jana */}
                   <div className="mt-2 flex flex-col gap-2">
                     {state.url ? (
                       <div className="flex flex-col gap-2">
@@ -286,6 +333,21 @@ export default function UgcStoryboard() {
               )
             })}
           </div>
+
+          {/* Paparan Video Gabungan Penuh */}
+          {stitchedVideo && (
+            <div className="bg-slate-950 border border-emerald-500/50 p-6 rounded-2xl flex flex-col items-center gap-4 mt-4">
+              <h3 className="text-base font-bold text-emerald-400">🎉 Video Iklan UGC Lengkap (Siap Dicantum)</h3>
+              <video src={stitchedVideo} controls autoPlay className="w-full max-w-xs h-auto rounded-xl border border-slate-800" />
+              <a
+                href={stitchedVideo}
+                download="iklan-ugc-full.mp4"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-6 py-2.5 rounded-xl transition shadow-lg"
+              >
+                📥 Muat Turun Video Iklan Penuh (MP4)
+              </a>
+            </div>
+          )}
         </div>
       )}
     </div>
