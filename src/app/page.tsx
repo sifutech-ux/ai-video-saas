@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import UgcStoryboard from './components/UgcStoryboard'
 
 interface HistoryItem {
   id: string
@@ -11,6 +12,7 @@ interface HistoryItem {
 }
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<'studio' | 'ugc'>('studio')
   const [prompt, setPrompt] = useState('')
   const [aspectRatio, setAspectRatio] = useState('16:9')
   const [selectedStyle, setSelectedStyle] = useState('Cinematic')
@@ -73,7 +75,6 @@ export default function Home() {
           setStatusMessage('🎉 Video anda telah siap sepenuhnya!')
           setIsGenerating(false)
 
-          // Tambah ke Sejarah Video (Feature 3)
           const newItem: HistoryItem = {
             id: jobId,
             url,
@@ -152,193 +153,222 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Panel Kiri: Input & Tetapan */}
-        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-5">
-          <div>
-            <h2 className="text-lg font-semibold mb-1">Jana Video AI</h2>
-            <p className="text-xs text-slate-400">Tukar idea teks atau gambar anda menjadi video sinematik.</p>
-          </div>
+      {/* Navigasi Tab */}
+      <div className="max-w-7xl w-full mx-auto px-6 pt-6 flex gap-3">
+        <button
+          onClick={() => setActiveTab('studio')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            activeTab === 'studio'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
+              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span>🎬</span> Studio Video AI
+        </button>
+        <button
+          onClick={() => setActiveTab('ugc')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            activeTab === 'ugc'
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-pink-900/30'
+              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span>✨</span> UGC Ad Creator (TikTok/Reels)
+        </button>
+      </div>
 
-          {/* Templat Prompt Pantas (Feature 2) */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold text-purple-400">💡 Templat Prompt Pantas</label>
-            <div className="flex flex-wrap gap-2">
-              {presets.map((preset, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setPrompt(preset.text)}
-                  className="text-[11px] bg-slate-950 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-600/50 text-slate-300 px-2.5 py-1 rounded-lg transition"
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Muat Naik Gambar */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-300 flex items-center justify-between">
-              <span>Gambar Sumber (Image-to-Video)</span>
-              {imagePreview && (
-                <button type="button" onClick={removeImage} className="text-xs text-red-400 hover:underline">
-                  Padam Gambar
-                </button>
-              )}
-            </label>
-            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" />
-
-            {!imagePreview ? (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border border-dashed border-slate-800 hover:border-purple-500 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition bg-slate-950 hover:bg-slate-950/80 text-center"
-              >
-                <span className="text-lg mb-0.5">🖼️</span>
-                <p className="text-xs text-slate-400">Klik untuk muat naik gambar rujukan</p>
-              </div>
-            ) : (
-              <div className="relative rounded-xl overflow-hidden border border-purple-500/50 max-h-36 flex items-center justify-center bg-slate-950">
-                <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover" />
-                <button
-                  type="button"
-                  onClick={removeImage}
-                  className="absolute top-2 right-2 bg-slate-950/80 hover:bg-red-600 text-white p-1 rounded-full text-xs transition"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Prompt Teks */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-300">Prompt Teks</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Contoh: Seekor kucing angkasa lepas..."
-              className="w-full h-20 bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500 transition resize-none placeholder:text-slate-600"
-            />
-          </div>
-
-          {/* Pilihan Gaya Visual (Feature 4) */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-300">Gaya Visual (Style)</label>
-            <div className="grid grid-cols-3 gap-2">
-              {styleOptions.map((style) => (
-                <button
-                  key={style}
-                  type="button"
-                  onClick={() => setSelectedStyle(style)}
-                  className={`py-1.5 px-2 text-[11px] rounded-lg border font-medium transition ${
-                    selectedStyle === style
-                      ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  {style}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Nisbah Paparan */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-slate-300">Nisbah Paparan (Aspect Ratio)</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: '16:9', value: '16:9' },
-                { label: '9:16', value: '9:16' },
-                { label: '1:1', value: '1:1' },
-              ].map((ratio) => (
-                <button
-                  key={ratio.value}
-                  type="button"
-                  onClick={() => setAspectRatio(ratio.value)}
-                  className={`py-1.5 px-2 text-xs rounded-lg border font-medium transition ${
-                    aspectRatio === ratio.value
-                      ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  {ratio.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Suis Audio */}
-          <div className="flex items-center justify-between bg-slate-950 border border-slate-800 p-3 rounded-xl">
-            <div className="flex items-center gap-2.5">
-              <span className="text-base">🔊</span>
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6">
+        {activeTab === 'ugc' ? (
+          <UgcStoryboard />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Panel Kiri: Input & Tetapan */}
+            <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-5">
               <div>
-                <p className="text-xs font-semibold text-slate-200">Jana Audio & SFX AI</p>
-                <p className="text-[10px] text-slate-500">Kesan bunyi & muzik latar automatik</p>
+                <h2 className="text-lg font-semibold mb-1">Jana Video AI</h2>
+                <p className="text-xs text-slate-400">Tukar idea teks atau gambar anda menjadi video sinematik.</p>
+              </div>
+
+              {/* Templat Prompt Pantas */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-purple-400">💡 Templat Prompt Pantas</label>
+                <div className="flex flex-wrap gap-2">
+                  {presets.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setPrompt(preset.text)}
+                      className="text-[11px] bg-slate-950 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-600/50 text-slate-300 px-2.5 py-1 rounded-lg transition"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Muat Naik Gambar */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-slate-300 flex items-center justify-between">
+                  <span>Gambar Sumber (Image-to-Video)</span>
+                  {imagePreview && (
+                    <button type="button" onClick={removeImage} className="text-xs text-red-400 hover:underline">
+                      Padam Gambar
+                    </button>
+                  )}
+                </label>
+                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" />
+
+                {!imagePreview ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border border-dashed border-slate-800 hover:border-purple-500 rounded-xl p-3 flex flex-col items-center justify-center cursor-pointer transition bg-slate-950 hover:bg-slate-950/80 text-center"
+                  >
+                    <span className="text-lg mb-0.5">🖼️</span>
+                    <p className="text-xs text-slate-400">Klik untuk muat naik gambar rujukan</p>
+                  </div>
+                ) : (
+                  <div className="relative rounded-xl overflow-hidden border border-purple-500/50 max-h-36 flex items-center justify-center bg-slate-950">
+                    <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover" />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute top-2 right-2 bg-slate-950/80 hover:bg-red-600 text-white p-1 rounded-full text-xs transition"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Prompt Teks */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-slate-300">Prompt Teks</label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Contoh: Seekor kucing angkasa lepas..."
+                  className="w-full h-20 bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500 transition resize-none placeholder:text-slate-600"
+                />
+              </div>
+
+              {/* Pilihan Gaya Visual */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-slate-300">Gaya Visual (Style)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {styleOptions.map((style) => (
+                    <button
+                      key={style}
+                      type="button"
+                      onClick={() => setSelectedStyle(style)}
+                      className={`py-1.5 px-2 text-[11px] rounded-lg border font-medium transition ${
+                        selectedStyle === style
+                          ? 'bg-purple-600/20 border-purple-500 text-purple-300'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nisbah Paparan */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-slate-300">Nisbah Paparan (Aspect Ratio)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: '16:9', value: '16:9' },
+                    { label: '9:16', value: '9:16' },
+                    { label: '1:1', value: '1:1' },
+                  ].map((ratio) => (
+                    <button
+                      key={ratio.value}
+                      type="button"
+                      onClick={() => setAspectRatio(ratio.value)}
+                      className={`py-1.5 px-2 text-xs rounded-lg border font-medium transition ${
+                        aspectRatio === ratio.value
+                          ? 'bg-purple-600/20 border-purple-500 text-purple-300'
+                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                      }`}
+                    >
+                      {ratio.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Suis Audio */}
+              <div className="flex items-center justify-between bg-slate-950 border border-slate-800 p-3 rounded-xl">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">🔊</span>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-200">Jana Audio & SFX AI</p>
+                    <p className="text-[10px] text-slate-500">Kesan bunyi & muzik latar automatik</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={enableAudio}
+                  onChange={(e) => setEnableAudio(e.target.checked)}
+                  className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                />
+              </div>
+
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-semibold rounded-xl transition shadow-lg shadow-purple-900/20 disabled:opacity-50 text-sm mt-1"
+              >
+                {isGenerating ? '🔄 Sedang Diproses...' : '🎬 Jana Video (1 Kredit)'}
+              </button>
+            </div>
+
+            {/* Panel Kanan: Hasil & Butang Muat Turun */}
+            <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
+              <h2 className="text-lg font-semibold">Hasil & Status Penjanaan</h2>
+
+              {statusMessage && (
+                <div className="p-3.5 bg-slate-950 border border-purple-500/30 rounded-xl text-xs text-purple-300">
+                  {statusMessage}
+                </div>
+              )}
+
+              {enhancedPrompt && (
+                <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex flex-col gap-1">
+                  <span className="text-xs font-semibold text-amber-400">✨ Prompt Dioptimumkan ({selectedStyle}):</span>
+                  <p className="text-xs text-slate-300 italic">"{enhancedPrompt}"</p>
+                </div>
+              )}
+
+              <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl flex flex-col items-center justify-center overflow-hidden relative min-h-[280px]">
+                {videoUrl ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-2 gap-3">
+                    <video src={videoUrl} controls autoPlay loop className="w-full max-h-[380px] object-contain rounded-lg" />
+                    <a
+                      href={videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download="beshare-ai-video.mp4"
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-emerald-950/40"
+                    >
+                      📥 Muat Turun Video MP4
+                    </a>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <span className="text-4xl block mb-3 opacity-40">📹</span>
+                    <p className="text-sm text-slate-400 max-w-sm">
+                      Video yang siap dijana akan dipaparkan dan dimainkan secara automatik di sini.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-            <input
-              type="checkbox"
-              checked={enableAudio}
-              onChange={(e) => setEnableAudio(e.target.checked)}
-              className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-            />
           </div>
-
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-semibold rounded-xl transition shadow-lg shadow-purple-900/20 disabled:opacity-50 text-sm mt-1"
-          >
-            {isGenerating ? '🔄 Sedang Diproses...' : '🎬 Jana Video (1 Kredit)'}
-          </button>
-        </div>
-
-        {/* Panel Kanan: Hasil & Butang Muat Turun */}
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-          <h2 className="text-lg font-semibold">Hasil & Status Penjanaan</h2>
-
-          {statusMessage && (
-            <div className="p-3.5 bg-slate-950 border border-purple-500/30 rounded-xl text-xs text-purple-300">
-              {statusMessage}
-            </div>
-          )}
-
-          {enhancedPrompt && (
-            <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl flex flex-col gap-1">
-              <span className="text-xs font-semibold text-amber-400">✨ Prompt Dioptimumkan ({selectedStyle}):</span>
-              <p className="text-xs text-slate-300 italic">"{enhancedPrompt}"</p>
-            </div>
-          )}
-
-          <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl flex flex-col items-center justify-center overflow-hidden relative min-h-[280px]">
-            {videoUrl ? (
-              <div className="w-full h-full flex flex-col items-center justify-center p-2 gap-3">
-                <video src={videoUrl} controls autoPlay loop className="w-full max-h-[380px] object-contain rounded-lg" />
-                {/* Butang Muat Turun Video (Feature 1) */}
-                <a
-                  href={videoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download="beshare-ai-video.mp4"
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-emerald-950/40"
-                >
-                  📥 Muat Turun Video MP4
-                </a>
-              </div>
-            ) : (
-              <div className="p-8 text-center">
-                <span className="text-4xl block mb-3 opacity-40">📹</span>
-                <p className="text-sm text-slate-400 max-w-sm">
-                  Video yang siap dijana akan dipaparkan dan dimainkan secara automatik di sini.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </main>
 
-      {/* Sejarah Video Janaan (Feature 3) */}
+      {/* Sejarah Video Janaan */}
       {history.length > 0 && (
         <section className="max-w-7xl w-full mx-auto px-6 mt-6">
           <h3 className="text-base font-bold text-slate-200 mb-4 flex items-center gap-2">
