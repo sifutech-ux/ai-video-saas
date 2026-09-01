@@ -59,22 +59,16 @@ export default function UgcStoryboard() {
     }
   }
 
-  const handlePlayAudio = async (text: string) => {
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      const data = await res.json()
-      if (data.audioUrl) {
-        const audio = new Audio(data.audioUrl)
-        audio.play()
-      } else {
-        alert('Gagal mendapatkan fail audio.')
-      }
-    } catch (err) {
-      alert('Ralat memainkan audio suara.')
+  // Percakapan audio percuma terus melalui pelayar (tanpa sekatan CORS)
+  const handlePlayAudio = (text: string) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'ms-MY'
+      utterance.rate = 0.95
+      window.speechSynthesis.speak(utterance)
+    } else {
+      alert('Pelayar anda tidak menyokong fungsi percakapan audio.')
     }
   }
 
