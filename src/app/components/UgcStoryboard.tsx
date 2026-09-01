@@ -28,10 +28,7 @@ export default function UgcStoryboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [scriptData, setScriptData] = useState<ScriptData | null>(null)
 
-  // Rekod status penjanaan video bagi setiap adegan (Scene 1-4)
   const [sceneStates, setSceneStates] = useState<{ [key: number]: SceneState }>({})
-
-  // State untuk pencantum video akhir
   const [stitchedVideo, setStitchedVideo] = useState('')
   const [isStitching, setIsStitching] = useState(false)
 
@@ -59,7 +56,6 @@ export default function UgcStoryboard() {
     }
   }
 
-  // Percakapan audio percuma terus melalui pelayar (tanpa sekatan CORS)
   const handlePlayAudio = (text: string) => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel()
@@ -139,14 +135,18 @@ export default function UgcStoryboard() {
     }
   }
 
+  // Dihantar berurutan dengan sela masa 3.5 saat untuk mengelakkan ralat Rate Limit Replicate (429)
   const handleGenerateAllScenes = async () => {
     if (!scriptData) return
-    scriptData.scenes.forEach((scene) => {
+
+    for (const scene of scriptData.scenes) {
       const currentState = sceneStates[scene.sceneNumber]
       if (!currentState?.url && !currentState?.isGenerating) {
-        handleGenerateSceneVideo(scene)
+        await handleGenerateSceneVideo(scene)
+        // Tunggu 3.5 saat sebelum menghantar adegan seterusnya
+        await new Promise((resolve) => setTimeout(resolve, 3500))
       }
-    })
+    }
   }
 
   const handleStitchVideos = async () => {
@@ -189,7 +189,6 @@ export default function UgcStoryboard() {
         </p>
       </div>
 
-      {/* Form Input Maklumat Produk */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-medium text-slate-300 mb-1">Nama Produk *</label>
@@ -233,10 +232,8 @@ export default function UgcStoryboard() {
         {isLoading ? '🧠 Gemini sedang menulis skrip UGC...' : '📝 Jana Skrip & Papan Cerita 4-Adegan'}
       </button>
 
-      {/* Paparan Storyboard 4-Adegan */}
       {scriptData && (
         <div className="flex flex-col gap-4 mt-2">
-          {/* Header Papan Cerita & Butang Tindakan */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-950 p-4 border border-slate-800 rounded-xl gap-3">
             <div>
               <h3 className="text-sm font-bold text-amber-400">📋 {scriptData.title}</h3>
@@ -298,7 +295,6 @@ export default function UgcStoryboard() {
                     </div>
                   </div>
 
-                  {/* Pemain Video / Butang Jana */}
                   <div className="mt-2 flex flex-col gap-2">
                     {state.url ? (
                       <div className="flex flex-col gap-2">
@@ -328,7 +324,6 @@ export default function UgcStoryboard() {
             })}
           </div>
 
-          {/* Paparan Video Gabungan Penuh */}
           {stitchedVideo && (
             <div className="bg-slate-950 border border-emerald-500/50 p-6 rounded-2xl flex flex-col items-center gap-4 mt-4">
               <h3 className="text-base font-bold text-emerald-400">🎉 Video Iklan UGC Lengkap (Siap Dicantum)</h3>
