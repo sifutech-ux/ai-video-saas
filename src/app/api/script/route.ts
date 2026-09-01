@@ -15,16 +15,13 @@ export async function POST(req: Request) {
     }
 
     const systemPrompt = `
-Anda ialah pakar penulis skrip iklan TikTok UGC (User Generated Content) Bahasa Melayu yang tular.
+Anda ialah pakar penulis skrip iklan TikTok UGC Bahasa Melayu.
 Tugas anda adalah memproses maklumat produk dan menghasilkan skrip iklan 4-adegan dalam format JSON.
-Prompt visual (visualPrompt) MESTI direka khas untuk teknik Image-to-Video (I2V) bagi menggerakkan gambar rujukan secara semula jadi (cth: pergerakan kepala perlahan, kenyip mata, senyuman, pergerakan kamera rapat).
 
-Maklumat Produk:
-- Nama Produk: ${productName}
-- Kelebihan / Manfaat: ${productBenefits}
-- Sasaran Pelanggan: ${targetAudience || 'Pengguna umum'}
+PENTING UNTUK VISUAL PROMPT:
+Kerana kita menggunakan Image-to-Video, prompt visual MESTI RINGKAS dan HANYA fokus pada pergerakan halus (subtle motion) atau pergerakan kamera. JANGAN minta AI bina objek baharu, megenggang barang baharu, atau lukis semula muka/teks.
 
-Hasilkan output JSON dalam format berikut SAHAJA (tanpa sebarang markdown code block):
+Format JSON SAHAJA (tanpa markdown code block):
 {
   "title": "Skrip UGC ${productName}",
   "scenes": [
@@ -33,28 +30,28 @@ Hasilkan output JSON dalam format berikut SAHAJA (tanpa sebarang markdown code b
       "type": "avatar",
       "title": "Hook (0-3s)",
       "scriptMalay": "Skrip perbualan santai bercakap terus kepada kamera untuk menarik perhatian pembeli.",
-      "visualPrompt": "Animate the reference person speaking expressively to camera, realistic head movement, natural eye blink, smiling happily, holding ${productName} in hand."
+      "visualPrompt": "Subtle motion, reference person looking at camera with a natural friendly expression, smooth head tilt, cinematic lighting"
     },
     {
       "sceneNumber": 2,
       "type": "b-roll",
       "title": "Masalah / Close-up (3-6s)",
       "scriptMalay": "Skrip menceritakan masalah atau kesukaran sebelum berjumpa produk ini.",
-      "visualPrompt": "Close-up macro shot animating the reference product package with subtle cinematic slow zoom, soft lighting, showing premium details."
+      "visualPrompt": "Slow cinematic zoom in on the product, soft ambient lighting, high detail, clear focus"
     },
     {
       "sceneNumber": 3,
       "type": "b-roll",
       "title": "Penyelesaian (6-9s)",
       "scriptMalay": "Skrip menunjukkan rasa puas hati dan pengalaman menggunakan produk.",
-      "visualPrompt": "Cinematic B-roll shot animating product being unboxed or handled smoothly with subtle hand motion and natural lighting."
+      "visualPrompt": "Slow camera pan across the product, bright commercial studio lighting, crisp details"
     },
     {
       "sceneNumber": 4,
       "type": "avatar",
       "title": "Call To Action (9-12s)",
       "scriptMalay": "Skrip ajakan mesra untuk membeli sekarang di bag kuning/link.",
-      "visualPrompt": "Animate the reference person smiling warmly, pointing down towards screen invitingly, enthusiastic facial expression."
+      "visualPrompt": "Reference person smiling warmly at camera, slight head movement, welcoming atmosphere"
     }
   ]
 }
