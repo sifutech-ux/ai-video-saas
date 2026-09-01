@@ -56,15 +56,23 @@ export default function UgcStoryboard() {
     }
   }
 
-  const handlePlayAudio = (text: string) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.lang = 'ms-MY'
-      utterance.rate = 0.95
-      window.speechSynthesis.speak(utterance)
-    } else {
-      alert('Pelayar anda tidak menyokong fungsi percakapan audio.')
+  // Pradengar suara manusia realistik Azure Neural via API /api/tts
+  const handlePlayAudio = async (text: string, type: string) => {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, gender: type === 'avatar' ? 'female' : 'male' }),
+      })
+      const data = await res.json()
+      if (data.audioUrl) {
+        const audio = new Audio(data.audioUrl)
+        audio.play()
+      } else {
+        alert('Gagal mendapatkan fail audio.')
+      }
+    } catch (err) {
+      alert('Ralat memainkan audio suara.')
     }
   }
 
@@ -135,7 +143,7 @@ export default function UgcStoryboard() {
     }
   }
 
-  // Dihantar berurutan dengan sela masa 3.5 saat untuk mengelakkan ralat Rate Limit Replicate (429)
+  // Dihantar berurutan dengan sela masa 3.5 saat (elak 429 rate limit)
   const handleGenerateAllScenes = async () => {
     if (!scriptData) return
 
@@ -143,18 +151,24 @@ export default function UgcStoryboard() {
       const currentState = sceneStates[scene.sceneNumber]
       if (!currentState?.url && !currentState?.isGenerating) {
         await handleGenerateSceneVideo(scene)
-        // Tunggu 3.5 saat sebelum menghantar adegan seterusnya
         await new Promise((resolve) => setTimeout(resolve, 3500))
       }
     }
   }
 
+  // Hantar klip video & skrip adegan ke backend untuk dimasukkan audio percakapan & dicantumkan
   const handleStitchVideos = async () => {
-    const urls = Object.values(sceneStates)
-      .map((s) => s.url)
-      .filter(Boolean)
+    if (!scriptData) return
 
-    if (urls.length < 2) {
+    const sceneDataToSend = scriptData.scenes
+      .map((scene) => ({
+        url: sceneStates[scene.sceneNumber]?.url,
+        scriptMalay: scene.scriptMalay,
+        type: scene.type,
+      }))
+      .filter((s) => s.url)
+
+    if (sceneDataToSend.length < 2) {
       return alert('Sila jana sekurang-kurangnya 2 adegan sebelum mencantumkan video!')
     }
 
@@ -163,7 +177,7 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/stitch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ videoUrls: urls }),
+        body: JSON.stringify({ scenes: sceneDataToSend }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal mencantumkan video')
@@ -255,7 +269,7 @@ export default function UgcStoryboard() {
                   disabled={isStitching}
                   className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-lg disabled:opacity-50"
                 >
-                  {isStitching ? '🔄 Mencantumkan...' : '🎞️ Cantumkan Klip Menjadi 1 Video'}
+                  {isStitching ? '🔄 Mencantumkan Audio & Video...' : '🎞️ Cantumkan Klip Menjadi 1 Video'}
                 </button>
               )}
             </div>
@@ -280,7 +294,7 @@ export default function UgcStoryboard() {
                         <p className="text-[11px] text-slate-400 font-medium">Skrip Audio (BM):</p>
                         <button
                           type="button"
-                          onClick={() => handlePlayAudio(scene.scriptMalay)}
+                          onClick={() => handlePlayAudio(scene.scriptMalay, scene.type)}
                           className="text-[10px] bg-purple-950/60 hover:bg-purple-800 text-purple-300 border border-purple-700 px-2 py-0.5 rounded transition flex items-center gap-1"
                         >
                           🔊 Dengar Suara
@@ -326,7 +340,7 @@ export default function UgcStoryboard() {
 
           {stitchedVideo && (
             <div className="bg-slate-950 border border-emerald-500/50 p-6 rounded-2xl flex flex-col items-center gap-4 mt-4">
-              <h3 className="text-base font-bold text-emerald-400">🎉 Video Iklan UGC Lengkap (Siap Dicantum)</h3>
+              <h3 className="text-base font-bold text-emerald-400">🎉 Video Iklan UGC Lengkap (Siap Dicantum Dengan Audio)</h3>
               <video src={stitchedVideo} controls autoPlay className="w-full max-w-xs h-auto rounded-xl border border-slate-800" />
               <a
                 href={stitchedVideo}
