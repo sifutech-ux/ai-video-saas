@@ -109,6 +109,8 @@ export default function UgcStoryboard() {
           }))
         } else if (data.status === 'failed') {
           clearInterval(interval)
+          const errorMsg = data.error || 'Penjanaan video gagal di pelayan AI.'
+          alert(`Ralat Adegan ${sceneNumber}: ${errorMsg}`)
           setSceneStates((prev) => ({
             ...prev,
             [sceneNumber]: { isGenerating: false, status: '❌ Gagal', url: '' },
@@ -145,8 +147,8 @@ export default function UgcStoryboard() {
           prompt: scene.visualPrompt,
           aspectRatio: '9:16',
           imageUrl: selectedImage,
-          type: scene.type,             // Hantar jenis adegan ke backend
-          scriptMalay: scene.scriptMalay, // Hantar skrip untuk Lip-Sync audio
+          type: scene.type,
+          scriptMalay: scene.scriptMalay,
         }),
       })
 
