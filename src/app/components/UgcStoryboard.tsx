@@ -28,12 +28,10 @@ export default function UgcStoryboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [scriptData, setScriptData] = useState<ScriptData | null>(null)
 
-  // State Pilihan Suara (Lelaki / Perempuan)
-  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male')
-
-  // State Gambar Rujukan (Avatar & Produk)
+  // State Gambar & Audio Rujukan
   const [avatarImage, setAvatarImage] = useState<string | null>(null)
   const [productImage, setProductImage] = useState<string | null>(null)
+  const [customAudios, setCustomAudios] = useState<{ [key: number]: string }>({})
 
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
@@ -49,6 +47,17 @@ export default function UgcStoryboard() {
       reader.onloadend = () => {
         if (type === 'avatar') setAvatarImage(reader.result as string)
         else setProductImage(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, sceneNumber: number) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setCustomAudios((prev) => ({ ...prev, [sceneNumber]: reader.result as string }))
       }
       reader.readAsDataURL(file)
     }
@@ -83,7 +92,7 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, gender: voiceGender }),
+        body: JSON.stringify({ text }),
       })
       const data = await res.json()
       if (data.audioUrl) {
@@ -152,7 +161,7 @@ export default function UgcStoryboard() {
           imageUrl: selectedImage,
           type: scene.type,
           scriptMalay: scene.scriptMalay,
-          gender: voiceGender,
+          customAudio: customAudios[scene.sceneNumber] || null, // Hantar audio sendiri jika ada
         }),
       })
 
@@ -206,7 +215,7 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/stitch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes: sceneDataToSend, gender: voiceGender }),
+        body: JSON.stringify({ scenes: sceneDataToSend }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal mencantumkan video')
@@ -228,37 +237,8 @@ export default function UgcStoryboard() {
           ✨ UGC Script & Storyboard Generator
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Muat naik gambar rujukan orang & produk untuk menghasilkan video AI yang konsisten dan realistik.
+          Muat naik gambar rujukan orang, produk, atau rakam suara sendiri untuk hasil video AI yang realistik.
         </p>
-      </div>
-
-      {/* Bahagian Pemilihan Jantina Suara */}
-      <div className="bg-slate-950 p-4 border border-slate-800 rounded-xl flex items-center justify-between gap-4">
-        <span className="text-xs font-semibold text-slate-300">🎙️ Pilih Suara Avatar AI:</span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setVoiceGender('male')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-              voiceGender === 'male'
-                ? 'bg-purple-600 text-white border border-purple-400'
-                : 'bg-slate-900 text-slate-400 border border-slate-800'
-            }`}
-          >
-            👨🏻 Suara Lelaki (Osman)
-          </button>
-          <button
-            type="button"
-            onClick={() => setVoiceGender('female')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-              voiceGender === 'female'
-                ? 'bg-pink-600 text-white border border-pink-400'
-                : 'bg-slate-900 text-slate-400 border border-slate-800'
-            }`}
-          >
-            👩🏻 Suara Perempuan (Yasmin)
-          </button>
-        </div>
       </div>
 
       {/* Bahagian Muat Naik Gambar Rujukan */}
@@ -410,6 +390,29 @@ export default function UgcStoryboard() {
                       </div>
                       <p className="text-xs text-slate-200 italic bg-slate-900 p-2 rounded-lg border border-slate-800/80">"{scene.scriptMalay}"</p>
                     </div>
+
+                    {/* Bahagian Muat Naik Audio Sendiri (BAHARU) */}
+                    {scene.type === 'avatar' && (
+                      <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 flex flex-col gap-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-semibold text-emerald-400">🎙️ Suara Sendiri (Opsional):</span>
+                          {customAudios[scene.sceneNumber] && (
+                            <button
+                              onClick={() => setCustomAudios((prev) => { const n = { ...prev }; delete n[scene.sceneNumber]; return n })}
+                              className="text-[10px] text-red-400 hover:underline"
+                            >
+                              Padam Audio
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={(e) => handleAudioUpload(e, scene.sceneNumber)}
+                          className="text-[11px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:bg-emerald-950 file:text-emerald-300 hover:file:bg-emerald-800 cursor-pointer"
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <p className="text-[11px] text-slate-400 font-medium mb-0.5">Prompt Visual (AI Video):</p>
