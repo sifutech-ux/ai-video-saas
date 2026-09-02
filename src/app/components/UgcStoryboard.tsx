@@ -161,7 +161,7 @@ export default function UgcStoryboard() {
           imageUrl: selectedImage,
           type: scene.type,
           scriptMalay: scene.scriptMalay,
-          customAudio: customAudios[scene.sceneNumber] || null, // Hantar audio sendiri jika ada
+          customAudio: customAudios[scene.sceneNumber] || null,
         }),
       })
 
@@ -217,10 +217,16 @@ export default function UgcStoryboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenes: sceneDataToSend }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Gagal mencantumkan video')
 
-      setStitchedVideo(data.stitchedVideoUrl)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Gagal mencantumkan video')
+      }
+
+      // Terima respon binary sebagai Blob URL terus untuk elak ralat saiz Base64
+      const videoBlob = await res.blob()
+      const objectUrl = URL.createObjectURL(videoBlob)
+      setStitchedVideo(objectUrl)
     } catch (err: any) {
       alert(`Ralat cantum video: ${err.message}`)
     } finally {
@@ -391,7 +397,6 @@ export default function UgcStoryboard() {
                       <p className="text-xs text-slate-200 italic bg-slate-900 p-2 rounded-lg border border-slate-800/80">"{scene.scriptMalay}"</p>
                     </div>
 
-                    {/* Bahagian Muat Naik Audio Sendiri (BAHARU) */}
                     {scene.type === 'avatar' && (
                       <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 flex flex-col gap-1.5">
                         <div className="flex justify-between items-center">
