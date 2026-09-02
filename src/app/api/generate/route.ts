@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     if (type === 'avatar' && imageUrl) {
       let finalAudio = customAudio
 
-      // Jika tiada audio sendiri dimuat naik, gunakan Google TTS stabil (Elak ralat Status 400)
+      // Fallback ke Google TTS jika tiada audio sendiri dimuat naik
       if (!finalAudio && scriptMalay) {
         const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(scriptMalay)}&tl=ms&client=tw-ob`
         const audioRes = await fetch(ttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
@@ -31,18 +31,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Sila muat naik fail audio suara atau sediakan skrip!' }, { status: 400 })
       }
 
+      // Penjanaan Enjin LivePortrait (Visual Penuh Tanpa Crop + Lip-Sync)
       prediction = await replicate.predictions.create({
-        version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
+        model: "lucataco/live-portrait",
         input: {
-          source_image: imageUrl,
-          driven_audio: finalAudio,
-          enhancer: "gfpgan",
-          preprocess: "full",
-          still: false,
+          face_image: imageUrl,
+          driving_audio: finalAudio,
         }
       })
     } else {
-      // ADEGAN PRODUK (B-ROLL)
+      // ADEGAN PRODUK (B-ROLL MINIMAX)
       let finalPrompt = prompt
       if (imageUrl) {
         finalPrompt = `${prompt}, subtle natural movement, continuous shot, high quality, photorealistic, preserve original image details.`
