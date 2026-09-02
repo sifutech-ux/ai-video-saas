@@ -8,6 +8,7 @@ import os from 'os'
 export async function POST(req: Request) {
   try {
     const { scenes } = await req.json()
+
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
       return NextResponse.json({ error: 'Sila sediakan data adegan!' }, { status: 400 })
     }
@@ -28,14 +29,15 @@ export async function POST(req: Request) {
 
       const processedPath = path.join(tmpDir, `processed-scene-${i}.mp4`)
 
-      // Hanya tampal audio baharu jika ia adegan B-Roll (Produk)
-      // Adegan Avatar (Muka) dah siap ada audio dari model Lip-Sync
       if (scene.scriptMalay && scene.type === 'b-roll') {
-        const voice = 'ms-MY-OsmanNeural'
-        const ttsUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(scene.scriptMalay)}`
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(scene.scriptMalay)}&tl=ms&client=tw-ob`
         
         try {
-          const audioRes = await fetch(ttsUrl)
+          const audioRes = await fetch(ttsUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            },
+          })
           if (audioRes.ok) {
             const audioBuffer = await audioRes.arrayBuffer()
             const audioPath = path.join(tmpDir, `audio-${i}.mp3`)
