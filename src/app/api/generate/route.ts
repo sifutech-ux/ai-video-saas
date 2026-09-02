@@ -3,9 +3,31 @@ import Replicate from 'replicate'
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! })
 
+// Enjin Suara Lelaki Osman Neural (Microsoft Bing ReadAloud SSML)
+async function getMaleOsmanAudioBase64(text: string): Promise<string> {
+  const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='ms-MY'><voice name='ms-MY-OsmanNeural'><prosody pitch='+0Hz' rate='+0%'>${text}</prosody></voice></speak>`
+  
+  const res = await fetch('https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/single/actual?api-version=2024-03-01-preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/ssml+xml',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'TrustedClientToken': '6A5AA1D4EA5E40C081684B00F576E769',
+    },
+    body: ssml,
+  })
+
+  if (!res.ok) {
+    throw new Error(`Gagal menjana suara Osman Neural (Status: ${res.status})`)
+  }
+
+  const arrayBuffer = await res.arrayBuffer()
+  return `data:audio/mp3;base64,${Buffer.from(arrayBuffer).toString('base64')}`
+}
+
 export async function POST(req: Request) {
   try {
-    const { prompt, aspectRatio, imageUrl, type, scriptMalay, gender = 'male' } = await req.json()
+    const { prompt, aspectRatio, imageUrl, type, scriptMalay } = await req.json()
 
     if (!imageUrl && type === 'avatar') {
       return NextResponse.json({ error: 'Sila muat naik Gambar Avatar!' }, { status: 400 })
@@ -13,26 +35,9 @@ export async function POST(req: Request) {
 
     let prediction;
 
-    // ADEGAN AVATAR: Enjin Lip-Sync + Suara + Visual Penuh (Tanpa Crop)
     if (type === 'avatar' && imageUrl && scriptMalay) {
-      const voiceName = gender === 'female' ? 'ms-MY-YasminNeural' : 'ms-MY-OsmanNeural'
-      const ttsUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${voiceName}&text=${encodeURIComponent(scriptMalay)}`
-
-      let base64Audio = ''
-      try {
-        const audioRes = await fetch(ttsUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-        })
-        if (!audioRes.ok) throw new Error('TTS Service Busy')
-        const audioBuffer = await audioRes.arrayBuffer()
-        base64Audio = `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`
-      } catch (err) {
-        // Fallback Google TTS
-        const fallbackUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(scriptMalay)}&tl=ms&client=tw-ob`
-        const fallbackRes = await fetch(fallbackUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        const fallbackBuffer = await fallbackRes.arrayBuffer()
-        base64Audio = `data:audio/mp3;base64,${Buffer.from(fallbackBuffer).toString('base64')}`
-      }
+      // Dapatkan Audio Suara Lelaki Osman Neural sebenar
+      const base64Audio = await getMaleOsmanAudioBase64(scriptMalay)
 
       prediction = await replicate.predictions.create({
         version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
@@ -40,12 +45,12 @@ export async function POST(req: Request) {
           source_image: imageUrl,
           driven_audio: base64Audio,
           enhancer: "gfpgan",
-          preprocess: "full", // KUNCI UTAMA: Kekalkan pemotongan gambar penuh (Baju suit & latar belakang)
-          still: false,       // Benarkan pergerakan kepala & ekspresi semula jadi semasa bercakap
+          preprocess: "full", // Kekalkan saiz badan & latar belakang penuh
+          still: false,
         }
       })
     } else {
-      // ADEGAN PRODUK (B-ROLL): Guna Minimax
+      // ADEGAN PRODUK (B-ROLL)
       let finalPrompt = prompt
       if (imageUrl) {
         finalPrompt = `${prompt}, subtle natural movement, continuous shot, high quality, photorealistic, preserve original image details.`
