@@ -31,9 +31,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Sila muat naik fail audio suara atau sediakan skrip!' }, { status: 400 })
       }
 
-      // Penjanaan Enjin LivePortrait (Visual Penuh Tanpa Crop + Lip-Sync)
+      // LivePortrait Endpoint Rasmi via Replicate Version ID
       prediction = await replicate.predictions.create({
-        model: "lucataco/live-portrait",
+        version: "4c07e0c90472f8832a82645831627b049d5a9b9a674e2d33d83b27137f81ef6a",
         input: {
           face_image: imageUrl,
           driving_audio: finalAudio,
