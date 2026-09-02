@@ -3,6 +3,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 export async function POST(req: Request) {
   try {
     const { productName, productBenefits, targetAudience } = await req.json()
@@ -25,7 +27,7 @@ Gaya Penulisan:
 - Gunakan Bahasa Melayu santai, mesra, percakapan harian (seperti percakapan UGC TikTok Malaysia).
 - Jangan guna bahasa buku yang kaku.
 
-Format Output (WAJIB dalam format JSON SAHAJA):
+Format Output (WAJIB dalam format JSON SAHAJA, tanpa sebarang teks tambahan):
 {
   "title": "Tajuk Iklan UGC",
   "scenes": [
@@ -60,31 +62,35 @@ Format Output (WAJIB dalam format JSON SAHAJA):
   ]
 }`
 
-    // Senarai model Gemini sebagai sandaran automatik jika satu model capai kuota
-    const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
+    // Senarai model stabil untuk dicuba berturut-turut jika berlaku 503 / 429
+    const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash']
     let responseText = ''
-    let lastError = null
+    let lastError: any = null
 
-    for (const modelName of modelsToTry) {
+    for (const modelName of candidateModels) {
       try {
         const model = genAI.getGenerativeAIModel({ model: modelName })
         const result = await model.generateContent(prompt)
         responseText = result.response.text()
         if (responseText) break
       } catch (err: any) {
-        console.warn(`Model ${modelName} habis kuota/ralat, mencuba model seterusnya...`)
+        console.warn(`Model ${modelName} sibuk/ralat, mencuba model seterusnya...`, err)
         lastError = err
+        await sleep(1500)
       }
     }
 
     if (!responseText) {
       throw new Error(
-        lastError?.message || 'Semua model Gemini telah mencapai had kuota percuma harian.'
+        'Pelayan Google Gemini sedang sibuk. Sila tunggu 10-15 saat dan tekan butang sekali lagi.'
       )
     }
 
-    // Bersihkan format JSON
-    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim()
+    const cleanJson = responseText
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim()
+
     const parsedData = JSON.parse(cleanJson)
 
     return NextResponse.json({ success: true, data: parsedData })
