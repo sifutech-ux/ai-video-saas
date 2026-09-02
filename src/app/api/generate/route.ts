@@ -31,14 +31,30 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Sila muat naik fail audio suara atau sediakan skrip!' }, { status: 400 })
       }
 
-      // LivePortrait Endpoint Rasmi via Replicate Version ID
-      prediction = await replicate.predictions.create({
-        version: "4c07e0c90472f8832a82645831627b049d5a9b9a674e2d33d83b27137f81ef6a",
-        input: {
-          face_image: imageUrl,
-          driving_audio: finalAudio,
-        }
-      })
+      try {
+        // Uji LivePortrait menggunakan penunjuk nama model rasmi (Elak Ralat 422 Hash)
+        prediction = await replicate.predictions.create({
+          model: "lucataco/live-portrait",
+          input: {
+            face_image: imageUrl,
+            driving_audio: finalAudio,
+          }
+        })
+      } catch (liveErr) {
+        console.warn('LivePortrait gagal, menukar ke SadTalker stabil...', liveErr)
+        
+        // Fallback automatik ke SadTalker yang terbukti berjaya dalam out-4.mp4
+        prediction = await replicate.predictions.create({
+          version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
+          input: {
+            source_image: imageUrl,
+            driven_audio: finalAudio,
+            enhancer: "gfpgan",
+            preprocess: "full",
+            still: false,
+          }
+        })
+      }
     } else {
       // ADEGAN PRODUK (B-ROLL MINIMAX)
       let finalPrompt = prompt
