@@ -13,19 +13,28 @@ export async function POST(req: Request) {
 
     let prediction;
 
-    // ADEGAN AVATAR: Hantar URL HTTP Awam Terus ke Replicate
     if (type === 'avatar' && imageUrl && scriptMalay) {
+      // 1. Muat turun fail audio TTS secara server-side
       const voice = 'ms-MY-OsmanNeural'
       const ttsUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(scriptMalay)}`
+      
+      const audioRes = await fetch(ttsUrl)
+      if (!audioRes.ok) {
+        throw new Error('Gagal penjanaan fail audio TTS.')
+      }
 
+      const audioBuffer = await audioRes.arrayBuffer()
+      const base64Audio = `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`
+
+      // 2. Hantar Audio Base64 yang sah & tetapan imej stabil ke SadTalker
       prediction = await replicate.predictions.create({
         version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
         input: {
           source_image: imageUrl,
-          driven_audio: ttsUrl, // Pautan HTTP terus (Elak Ralat Video Bisu)
+          driven_audio: base64Audio,
           enhancer: "gfpgan",
-          preprocess: "full",   // Kekalkan bentuk muka penuh
-          still: false,
+          preprocess: "crop", // Memfokuskan kawasan muka secara tepat & mengelakkan ralat memproses
+          still: true,
         }
       })
     } else {
