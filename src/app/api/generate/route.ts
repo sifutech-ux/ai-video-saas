@@ -3,6 +3,9 @@ import Replicate from 'replicate'
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! })
 
+// Helper fungsi penunda masa (Delay)
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 export async function POST(req: Request) {
   try {
     const { prompt, aspectRatio, imageUrl, type, scriptMalay, customAudio } = await req.json()
@@ -31,30 +34,30 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Sila muat naik fail audio suara atau sediakan skrip!' }, { status: 400 })
       }
 
-      try {
-        // Uji LivePortrait menggunakan penunjuk nama model rasmi (Elak Ralat 422 Hash)
-        prediction = await replicate.predictions.create({
-          model: "lucataco/live-portrait",
-          input: {
-            face_image: imageUrl,
-            driving_audio: finalAudio,
+      // Fungsi Penjanaan Avatar dengan Auto-Retry jika Kena Sekatan 429 Rate Limit
+      const createAvatarPrediction = async (retryCount = 0): Promise<any> => {
+        try {
+          return await replicate.predictions.create({
+            version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
+            input: {
+              source_image: imageUrl,
+              driven_audio: finalAudio,
+              enhancer: "gfpgan",
+              preprocess: "full",
+              still: false,
+            }
+          })
+        } catch (err: any) {
+          // Jika ditahan oleh Ralat 429 Rate Limit, tunggu 10 saat dan cuba semula automatik
+          if ((err?.status === 429 || err?.message?.includes('429')) && retryCount < 2) {
+            await sleep(10500)
+            return createAvatarPrediction(retryCount + 1)
           }
-        })
-      } catch (liveErr) {
-        console.warn('LivePortrait gagal, menukar ke SadTalker stabil...', liveErr)
-        
-        // Fallback automatik ke SadTalker yang terbukti berjaya dalam out-4.mp4
-        prediction = await replicate.predictions.create({
-          version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
-          input: {
-            source_image: imageUrl,
-            driven_audio: finalAudio,
-            enhancer: "gfpgan",
-            preprocess: "full",
-            still: false,
-          }
-        })
+          throw err
+        }
       }
+
+      prediction = await createAvatarPrediction()
     } else {
       // ADEGAN PRODUK (B-ROLL MINIMAX)
       let finalPrompt = prompt
