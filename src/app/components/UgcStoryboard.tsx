@@ -80,7 +80,7 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, gender: type === 'avatar' ? 'female' : 'male' }),
+        body: JSON.stringify({ text, gender: 'male' }),
       })
       const data = await res.json()
       if (data.audioUrl) {
@@ -126,13 +126,16 @@ export default function UgcStoryboard() {
   }
 
   const handleGenerateSceneVideo = async (scene: Scene) => {
+    const selectedImage = scene.type === 'avatar' ? avatarImage : productImage
+
+    if (scene.type === 'avatar' && !selectedImage) {
+      return alert(`Sila muat naik Gambar Avatar untuk menjana adegan ${scene.sceneNumber}!`)
+    }
+
     setSceneStates((prev) => ({
       ...prev,
       [scene.sceneNumber]: { isGenerating: true, status: '🧠 Menghantar ke AI...', url: '' },
     }))
-
-    // Memilih gambar rujukan mengikut kategori adegan
-    const selectedImage = scene.type === 'avatar' ? avatarImage : productImage
 
     try {
       const res = await fetch('/api/generate', {
@@ -142,8 +145,8 @@ export default function UgcStoryboard() {
           prompt: scene.visualPrompt,
           aspectRatio: '9:16',
           imageUrl: selectedImage,
-          enableAudio: true,
-          style: 'Photorealistic',
+          type: scene.type,             // Hantar jenis adegan ke backend
+          scriptMalay: scene.scriptMalay, // Hantar skrip untuk Lip-Sync audio
         }),
       })
 
@@ -242,7 +245,9 @@ export default function UgcStoryboard() {
               <p className="text-xs text-slate-400">Muat naik gambar rujukan muka/orang</p>
             </div>
           ) : (
-            <img src={avatarImage} alt="Avatar" className="w-full h-24 object-cover rounded-lg border border-purple-500" />
+            <div className="w-full h-48 bg-black/60 rounded-lg p-1 border border-purple-500 flex items-center justify-center">
+              <img src={avatarImage} alt="Avatar" className="max-h-full max-w-full object-contain rounded" />
+            </div>
           )}
         </div>
 
@@ -263,7 +268,9 @@ export default function UgcStoryboard() {
               <p className="text-xs text-slate-400">Muat naik gambar rujukan produk/pek</p>
             </div>
           ) : (
-            <img src={productImage} alt="Produk" className="w-full h-24 object-cover rounded-lg border border-pink-500" />
+            <div className="w-full h-48 bg-black/60 rounded-lg p-1 border border-pink-500 flex items-center justify-center">
+              <img src={productImage} alt="Produk" className="max-h-full max-w-full object-contain rounded" />
+            </div>
           )}
         </div>
       </div>
