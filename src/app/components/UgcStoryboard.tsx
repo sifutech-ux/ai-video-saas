@@ -28,6 +28,9 @@ export default function UgcStoryboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [scriptData, setScriptData] = useState<ScriptData | null>(null)
 
+  // State Pilihan Suara (Lelaki / Perempuan)
+  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male')
+
   // State Gambar Rujukan (Avatar & Produk)
   const [avatarImage, setAvatarImage] = useState<string | null>(null)
   const [productImage, setProductImage] = useState<string | null>(null)
@@ -75,12 +78,12 @@ export default function UgcStoryboard() {
     }
   }
 
-  const handlePlayAudio = async (text: string, type: string) => {
+  const handlePlayAudio = async (text: string) => {
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, gender: 'male' }),
+        body: JSON.stringify({ text, gender: voiceGender }),
       })
       const data = await res.json()
       if (data.audioUrl) {
@@ -149,6 +152,7 @@ export default function UgcStoryboard() {
           imageUrl: selectedImage,
           type: scene.type,
           scriptMalay: scene.scriptMalay,
+          gender: voiceGender, // Hantar pilihan jantina suara
         }),
       })
 
@@ -202,7 +206,7 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/stitch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes: sceneDataToSend }),
+        body: JSON.stringify({ scenes: sceneDataToSend, gender: voiceGender }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal mencantumkan video')
@@ -226,6 +230,35 @@ export default function UgcStoryboard() {
         <p className="text-xs text-slate-400 mt-1">
           Muat naik gambar rujukan orang & produk untuk menghasilkan video AI yang konsisten dan realistik.
         </p>
+      </div>
+
+      {/* Bahagian Pemilihan Jantina Suara */}
+      <div className="bg-slate-950 p-4 border border-slate-800 rounded-xl flex items-center justify-between gap-4">
+        <span className="text-xs font-semibold text-slate-300">🎙️ Pilih Suara Avatar AI:</span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setVoiceGender('male')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              voiceGender === 'male'
+                ? 'bg-purple-600 text-white border border-purple-400'
+                : 'bg-slate-900 text-slate-400 border border-slate-800'
+            }`}
+          >
+            👨🏻 Suara Lelaki (Osman)
+          </button>
+          <button
+            type="button"
+            onClick={() => setVoiceGender('female')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              voiceGender === 'female'
+                ? 'bg-pink-600 text-white border border-pink-400'
+                : 'bg-slate-900 text-slate-400 border border-slate-800'
+            }`}
+          >
+            👩🏻 Suara Perempuan (Yasmin)
+          </button>
+        </div>
       </div>
 
       {/* Bahagian Muat Naik Gambar Rujukan */}
@@ -369,7 +402,7 @@ export default function UgcStoryboard() {
                         <p className="text-[11px] text-slate-400 font-medium">Skrip Audio (BM):</p>
                         <button
                           type="button"
-                          onClick={() => handlePlayAudio(scene.scriptMalay, scene.type)}
+                          onClick={() => handlePlayAudio(scene.scriptMalay)}
                           className="text-[10px] bg-purple-950/60 hover:bg-purple-800 text-purple-300 border border-purple-700 px-2 py-0.5 rounded transition flex items-center gap-1"
                         >
                           🔊 Dengar Suara
