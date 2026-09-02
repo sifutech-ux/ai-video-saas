@@ -3,7 +3,6 @@ import Replicate from 'replicate'
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! })
 
-// Helper fungsi penunda masa (Delay)
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function POST(req: Request) {
@@ -34,7 +33,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Sila muat naik fail audio suara atau sediakan skrip!' }, { status: 400 })
       }
 
-      // Fungsi Penjanaan Avatar dengan Auto-Retry jika Kena Sekatan 429 Rate Limit
+      // Penjanaan Avatar dengan preprocess: "ext" untuk elak gambar terpotong
       const createAvatarPrediction = async (retryCount = 0): Promise<any> => {
         try {
           return await replicate.predictions.create({
@@ -43,12 +42,11 @@ export async function POST(req: Request) {
               source_image: imageUrl,
               driven_audio: finalAudio,
               enhancer: "gfpgan",
-              preprocess: "full",
+              preprocess: "ext",  // KUNCI UTAMA: Extended framing untuk elak zoom/terpotong
               still: false,
             }
           })
         } catch (err: any) {
-          // Jika ditahan oleh Ralat 429 Rate Limit, tunggu 10 saat dan cuba semula automatik
           if ((err?.status === 429 || err?.message?.includes('429')) && retryCount < 2) {
             await sleep(10500)
             return createAvatarPrediction(retryCount + 1)
