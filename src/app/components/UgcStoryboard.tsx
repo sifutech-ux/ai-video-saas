@@ -152,7 +152,7 @@ export default function UgcStoryboard() {
           imageUrl: selectedImage,
           type: scene.type,
           scriptMalay: scene.scriptMalay,
-          gender: voiceGender, // Hantar pilihan jantina suara
+          gender: voiceGender,
         }),
       })
 
@@ -420,7 +420,11 @@ export default function UgcStoryboard() {
                   <div className="mt-2 flex flex-col gap-2">
                     {state.url ? (
                       <div className="flex flex-col gap-2">
-                        <video src={state.url} controls className="w-full h-40 object-cover rounded-lg bg-black" />
+                        <video
+                          src={state.url}
+                          controls
+                          className="w-full aspect-[9/16] max-h-80 object-contain rounded-lg bg-black"
+                        />
                         <a
                           href={state.url}
                           target="_blank"
