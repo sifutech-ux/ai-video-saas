@@ -14,26 +14,30 @@ export async function POST(req: Request) {
     let prediction;
 
     if (type === 'avatar' && imageUrl && scriptMalay) {
-      // 1. Muat turun fail audio TTS secara server-side
-      const voice = 'ms-MY-OsmanNeural'
-      const ttsUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(scriptMalay)}`
+      // 1. Dapatkan Audio TTS Bahasa Melayu (Google Translate TTS Engine)
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(scriptMalay)}&tl=ms&client=tw-ob`
       
-      const audioRes = await fetch(ttsUrl)
+      const audioRes = await fetch(ttsUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        },
+      })
+
       if (!audioRes.ok) {
-        throw new Error('Gagal penjanaan fail audio TTS.')
+        throw new Error(`Gagal memuat turun audio TTS (Status: ${audioRes.status})`)
       }
 
       const audioBuffer = await audioRes.arrayBuffer()
       const base64Audio = `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`
 
-      // 2. Hantar Audio Base64 yang sah & tetapan imej stabil ke SadTalker
+      // 2. Hantar Audio Base64 & Gambar ke SadTalker
       prediction = await replicate.predictions.create({
         version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
         input: {
           source_image: imageUrl,
           driven_audio: base64Audio,
           enhancer: "gfpgan",
-          preprocess: "crop", // Memfokuskan kawasan muka secara tepat & mengelakkan ralat memproses
+          preprocess: "crop",
           still: true,
         }
       })
