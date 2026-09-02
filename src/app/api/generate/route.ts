@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Sila muat naik fail audio suara atau sediakan skrip!' }, { status: 400 })
       }
 
-      // Penjanaan Avatar dengan preprocess: "resize" (Ubah saiz imej penuh tanpa memotong bingkai)
+      // Tetapan Paling Selamat: preprocess "full"
       const createAvatarPrediction = async (retryCount = 0): Promise<any> => {
         try {
           return await replicate.predictions.create({
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
               source_image: imageUrl,
               driven_audio: finalAudio,
               enhancer: "gfpgan",
-              preprocess: "resize", // Tetapan tepat untuk elak potong/zoom bingkai
+              preprocess: "full", // Tetapan paling stabil & muka kekal asal
               still: false,
             }
           })
