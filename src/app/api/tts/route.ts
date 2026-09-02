@@ -2,20 +2,17 @@ import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   try {
-    const { text, gender = 'female' } = await req.json()
+    const { text } = await req.json()
 
     if (!text) {
       return NextResponse.json({ error: 'Sila masukkan teks!' }, { status: 400 })
     }
 
-    // Menggunakan Microsoft Azure Neural Voice (Yasmin / Osman)
-    const voice = gender === 'male' ? 'ms-MY-OsmanNeural' : 'ms-MY-YasminNeural'
-    const encodedText = encodeURIComponent(text)
-    const audioUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodedText}`
+    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ms&client=tw-ob`
 
     return NextResponse.json({
       success: true,
-      audioUrl,
+      audioUrl: ttsUrl,
     })
   } catch (error: any) {
     console.error('Ralat API TTS:', error)
