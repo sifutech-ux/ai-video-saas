@@ -7,7 +7,7 @@ import os from 'os'
 
 export async function POST(req: Request) {
   try {
-    const { scenes } = await req.json()
+    const { scenes, gender = 'male' } = await req.json()
 
     if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
       return NextResponse.json({ error: 'Sila sediakan data adegan!' }, { status: 400 })
@@ -17,6 +17,9 @@ export async function POST(req: Request) {
     const processedVideoFiles: string[] = []
     const fileListPath = path.join(tmpDir, `filelist-${Date.now()}.txt`)
     const finalOutputPath = path.join(tmpDir, `final-ugc-${Date.now()}.mp4`)
+
+    // Tetapkan nama suara Azure Neural mengikut pilihan jantina
+    const voiceName = gender === 'female' ? 'ms-MY-YasminNeural' : 'ms-MY-OsmanNeural'
 
     for (let i = 0; i < scenes.length; i++) {
       const scene = scenes[i]
@@ -29,8 +32,8 @@ export async function POST(req: Request) {
 
       const processedPath = path.join(tmpDir, `processed-scene-${i}.mp4`)
 
-      if (scene.scriptMalay && scene.type === 'b-roll') {
-        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(scene.scriptMalay)}&tl=ms&client=tw-ob`
+      if (scene.scriptMalay) {
+        const ttsUrl = `https://api.streamelements.com/kappa/v2/speech?voice=${voiceName}&text=${encodeURIComponent(scene.scriptMalay)}`
         
         try {
           const audioRes = await fetch(ttsUrl, {
@@ -38,11 +41,13 @@ export async function POST(req: Request) {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             },
           })
+          
           if (audioRes.ok) {
             const audioBuffer = await audioRes.arrayBuffer()
             const audioPath = path.join(tmpDir, `audio-${i}.mp3`)
             fs.writeFileSync(audioPath, Buffer.from(audioBuffer))
 
+            // Gabungkan video Minimax dengan Audio Suara Lelaki Osman
             const mergeCmd = `"${ffmpegPath}" -y -i "${videoPath}" -i "${audioPath}" -c:v copy -c:a aac -b:a 192k -shortest "${processedPath}"`
             execSync(mergeCmd)
 
@@ -52,7 +57,7 @@ export async function POST(req: Request) {
             continue
           }
         } catch (e) {
-          console.warn(`Gagal gabung audio adegan produk ${i}`, e)
+          console.warn(`Gagal gabung audio adegan ${i}:`, e)
         }
       }
       processedVideoFiles.push(videoPath)
