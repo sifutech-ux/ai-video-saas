@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 export async function POST(req: Request) {
   try {
@@ -9,76 +9,89 @@ export async function POST(req: Request) {
 
     if (!productName || !productBenefits) {
       return NextResponse.json(
-        { error: 'Sila masukkan nama produk dan kelebihan utama!' },
+        { error: 'Sila sediakan Nama Produk dan Kelebihan Utama!' },
         { status: 400 }
       )
     }
 
-    const systemPrompt = `
-Anda ialah pakar penulis skrip iklan TikTok UGC Bahasa Melayu.
-Tugas anda adalah memproses maklumat produk dan menghasilkan skrip iklan 4-adegan dalam format JSON.
+    const prompt = `Anda ialah pakar penulisan skrip iklan UGC TikTok Bahasa Melayu yang berpengalaman.
+Tugas anda adalah menghasilkan skrip & papan cerita (storyboard) 4-adegan untuk produk berikut:
 
-PENTING UNTUK VISUAL PROMPT:
-Kerana kita menggunakan Image-to-Video, prompt visual MESTI RINGKAS dan HANYA fokus pada pergerakan halus (subtle motion) atau pergerakan kamera. JANGAN minta AI bina objek baharu, megenggang barang baharu, atau lukis semula muka/teks.
+- Nama Produk: ${productName}
+- Kelebihan Utama: ${productBenefits}
+- Sasaran Pembeli: ${targetAudience || 'Umum'}
 
-Format JSON SAHAJA (tanpa markdown code block):
+Gaya Penulisan:
+- Gunakan Bahasa Melayu santai, mesra, percakapan harian (seperti percakapan UGC TikTok Malaysia).
+- Jangan guna bahasa buku yang kaku.
+
+Format Output (WAJIB dalam format JSON SAHAJA):
 {
-  "title": "Skrip UGC ${productName}",
+  "title": "Tajuk Iklan UGC",
   "scenes": [
     {
       "sceneNumber": 1,
       "type": "avatar",
       "title": "Hook (0-3s)",
-      "scriptMalay": "Skrip perbualan santai bercakap terus kepada kamera untuk menarik perhatian pembeli.",
-      "visualPrompt": "Subtle motion, reference person looking at camera with a natural friendly expression, smooth head tilt, cinematic lighting"
+      "scriptMalay": "Ayat percakapan di sini...",
+      "visualPrompt": "Subtle motion, reference person looking at camera with an engaging expression, smooth natural head tilt, soft studio lighting"
     },
     {
       "sceneNumber": 2,
       "type": "b-roll",
       "title": "Masalah / Close-up (3-6s)",
-      "scriptMalay": "Skrip menceritakan masalah atau kesukaran sebelum berjumpa produk ini.",
-      "visualPrompt": "Slow cinematic zoom in on the product, soft ambient lighting, high detail, clear focus"
+      "scriptMalay": "Ayat percakapan di sini...",
+      "visualPrompt": "Slow cinematic zoom in on the product, soft ambient lighting, high detail, sharp focus"
     },
     {
       "sceneNumber": 3,
       "type": "b-roll",
       "title": "Penyelesaian (6-9s)",
-      "scriptMalay": "Skrip menunjukkan rasa puas hati dan pengalaman menggunakan produk.",
-      "visualPrompt": "Slow camera pan across the product, bright commercial studio lighting, crisp details"
+      "scriptMalay": "Ayat percakapan di sini...",
+      "visualPrompt": "Slow camera pan across the prepared product, bright commercial studio lighting, crisp details"
     },
     {
       "sceneNumber": 4,
       "type": "avatar",
       "title": "Call To Action (9-12s)",
-      "scriptMalay": "Skrip ajakan mesra untuk membeli sekarang di bag kuning/link.",
+      "scriptMalay": "Ayat percakapan di sini...",
       "visualPrompt": "Reference person smiling warmly at camera, slight head movement, welcoming atmosphere"
     }
   ]
-}
-`
+}`
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: systemPrompt,
-    })
+    // Senarai model Gemini sebagai sandaran automatik jika satu model capai kuota
+    const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
+    let responseText = ''
+    let lastError = null
 
-    const rawText = response.text ? response.text.trim() : ''
-    
-    const cleanedJson = rawText
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/, '')
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeAIModel({ model: modelName })
+        const result = await model.generateContent(prompt)
+        responseText = result.response.text()
+        if (responseText) break
+      } catch (err: any) {
+        console.warn(`Model ${modelName} habis kuota/ralat, mencuba model seterusnya...`)
+        lastError = err
+      }
+    }
 
-    const parsedData = JSON.parse(cleanedJson)
+    if (!responseText) {
+      throw new Error(
+        lastError?.message || 'Semua model Gemini telah mencapai had kuota percuma harian.'
+      )
+    }
 
-    return NextResponse.json({
-      success: true,
-      data: parsedData,
-    })
+    // Bersihkan format JSON
+    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim()
+    const parsedData = JSON.parse(cleanJson)
+
+    return NextResponse.json({ success: true, data: parsedData })
   } catch (error: any) {
-    console.error('Ralat API Skrip UGC:', error)
+    console.error('Ralat API Script:', error)
     return NextResponse.json(
-      { error: 'Gagal menjana skrip UGC: ' + error.message },
+      { error: error.message || 'Gagal menjana skrip UGC.' },
       { status: 500 }
     )
   }
