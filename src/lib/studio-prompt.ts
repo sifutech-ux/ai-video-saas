@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
-
 export const STYLE_HINTS: Record<string, string> = {
   Cinematic: 'cinematic film still, anamorphic lens, shallow depth of field, motivated lighting, subtle film grain',
   Photorealistic: 'photorealistic, natural light, true-to-life texture, sharp detail',
@@ -57,13 +55,8 @@ Aspect ratio: ${aspectRatio}.
 Rules: one paragraph only, no title, no quotes, keep the user's subject, do not invent extra people, describe camera and light, include the visual style, no on-screen text.`
 
   try {
-    const genAI = new GoogleGenerativeAI(key)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-    const result = await Promise.race([
-      model.generateContent(instruction),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), 8000)),
-    ])
-    const text = cleanModelText(result.response.text())
+    const { askGemini } = await import('./gemini-text')
+    const text = cleanModelText(await askGemini(instruction, { timeoutMs: 8000 }))
     if (text) return ensureStyle(text, input.style, aspectRatio)
   } catch (error) {
     console.warn('Arahan studio: Gemini tidak digunakan.', error instanceof Error ? error.message : error)
