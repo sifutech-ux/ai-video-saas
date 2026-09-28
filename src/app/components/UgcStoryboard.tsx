@@ -366,7 +366,7 @@ export default function UgcStoryboard() {
           {stitchedVideo && (
             <div className="bg-slate-950 border border-emerald-500/50 p-6 rounded-2xl flex flex-col items-center gap-4">
               <h3 className="text-base font-bold text-emerald-400">Iklan siap</h3>
-              <video src={stitchedVideo} controls autoPlay className="w-full max-w-xs h-auto rounded-xl border border-slate-800" />
+              <video src={stitchedVideo} controls playsInline className="w-full max-w-xs h-auto rounded-xl border border-slate-800" />
               <a
                 href={stitchedVideo}
                 download="iklan-ugc.mp4"
