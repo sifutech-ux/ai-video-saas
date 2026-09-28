@@ -12,10 +12,18 @@ import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { TTS_MODELS, geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection, speechScript } from '../src/lib/malay-voice.ts'
 import { dressStoryboard, localAd, oneAd, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
-import { sceneOutputUrl, SCENE_MISS, restageImage } from '../src/lib/restage-image.ts'
+import { sceneOutputUrl, SCENE_MISS, restageImage, createAvatarStill, AVATAR_STILL_MISS, AVATAR_STILL_MODEL } from '../src/lib/restage-image.ts'
 import { publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
 import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
+import {
+  adultAvatarNote,
+  AVATAR_MINOR,
+  AVATAR_NOTE_MISS,
+  avatarStillPrompt,
+  minorAvatarNote,
+  presenterMode,
+} from '../src/lib/avatar-still.ts'
 import { parseStoryboard, publicGeminiError, TEXT_MODELS, textThinking } from '../src/lib/gemini-text.ts'
 import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -290,4 +298,66 @@ test('dua klip dicantum menjadi satu video', () => {
   assert.ok(peak, heard.stderr)
   assert.ok(Number(peak?.[1]) > -40, peak?.[0])
   fs.rmSync(dir, { recursive: true, force: true })
+})
+
+test('avatar AI cipta orang dewasa dalam scene, muka gambar kekal lalai', async () => {
+  assert.equal(presenterMode(undefined), 'muka')
+  assert.equal(presenterMode('muka'), 'muka')
+  assert.equal(presenterMode('avatar'), 'avatar')
+  assert.equal(adultAvatarNote('  lelaki dewasa 30 tahun, kemeja navy  '), 'lelaki dewasa 30 tahun, kemeja navy')
+  assert.equal(adultAvatarNote(`${'lelaki dewasa baju hitam. '.repeat(20)}`).length, 240)
+  assert.equal(minorAvatarNote('lelaki dewasa 21 tahun, baju hitam'), false)
+  assert.throws(() => adultAvatarNote('pendek'), new RegExp(AVATAR_NOTE_MISS))
+  for (const note of ['budak lelaki 10 tahun baju merah', 'perempuan 16 tahun', 'anak kecil baju biru', 'remaja perempuan', 'umur 17, baju putih']) {
+    assert.equal(minorAvatarNote(note), true, note)
+    assert.throws(() => adultAvatarNote(note), new RegExp(AVATAR_MINOR))
+  }
+  const live = avatarStillPrompt('live', 'lelaki dewasa 28 tahun, kemeja navy, rambut pendek')
+  assert.match(live, /bright live-selling table/)
+  assert.match(live, /kemeja navy/)
+  assert.match(live, /Adult, not a child/)
+  assert.match(live, /9:16/)
+  assert.match(avatarStillPrompt('kecantikan', 'perempuan dewasa 32 tahun, blouse putih'), /soft vanity close-up/)
+  assert.match(avatarStillPrompt('pelancaran', 'lelaki dewasa 40 tahun, kot gelap'), /premium product pedestal/)
+  assert.match(avatarStillPrompt('santai', 'perempuan dewasa 27 tahun, t-shirt putih'), /casual UGC tabletop/)
+
+  assert.throws(() => avatarStillPrompt('live', 'budak 8 tahun'), new RegExp(AVATAR_MINOR))
+
+  let seen: { model?: string; input?: Record<string, unknown> } | null = null
+  const url = await createAvatarStill(
+    {
+      predictions: {
+        async create(body) {
+          seen = body
+          return { id: 'pred', status: 'succeeded', output: ['https://replicate.delivery/avatar.jpg'] }
+        },
+        async get() {
+          return { id: 'pred', status: 'failed' }
+        },
+      },
+    },
+    live
+  )
+  assert.equal(url, 'https://replicate.delivery/avatar.jpg')
+  assert.equal(seen?.model, AVATAR_STILL_MODEL)
+  assert.equal(seen?.input?.aspect_ratio, '9:16')
+  assert.equal(seen?.input?.input_image, undefined)
+  assert.match(String(seen?.input?.prompt), /bright live-selling table/)
+
+  await assert.rejects(
+    () => createAvatarStill(
+      {
+        predictions: {
+          async create() {
+            return { id: 'pred', status: 'failed', output: null }
+          },
+          async get() {
+            return { id: 'pred', status: 'failed' }
+          },
+        },
+      },
+      avatarStillPrompt('santai', 'perempuan dewasa 25 tahun, baju putih')
+    ),
+    new RegExp(AVATAR_STILL_MISS)
+  )
 })
