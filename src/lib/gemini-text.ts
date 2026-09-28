@@ -24,8 +24,18 @@ export function publicGeminiError(message: string) {
   if (/429|quota|resource exhausted|RESOURCE_EXHAUSTED/i.test(message)) {
     return 'Kuota Gemini penuh sebentar. Tunggu seminit, kemudian tekan sekali lagi.'
   }
+  if (geminiBusy(message)) {
+    return 'Penulis skrip sedang sibuk. Tunggu sebentar, kemudian tekan Buat iklan sekali lagi.'
+  }
   const clean = message.replace(/\s+/g, ' ').trim()
-  return clean ? (clean.length > 180 ? `${clean.slice(0, 180)}…` : clean) : 'Gemini tidak memulangkan jawapan.'
+  if (!clean || clean.startsWith('{') || /"code"\s*:/.test(clean)) {
+    return 'Penulis skrip sedang sibuk. Tunggu sebentar, kemudian tekan Buat iklan sekali lagi.'
+  }
+  return clean.length > 180 ? `${clean.slice(0, 180)}…` : clean
+}
+
+export function geminiBusy(message: string) {
+  return /503|UNAVAILABLE|high demand|currently experiencing|overloaded/i.test(message)
 }
 
 export function parseStoryboard(text: string) {
@@ -49,26 +59,41 @@ export async function askGemini(prompt: string, options: { json?: boolean; timeo
   const timeoutMs = options.timeoutMs ?? 15000
   let lastError = 'Gemini tidak memulangkan jawapan.'
 
-  for (const model of TEXT_MODELS) {
-    try {
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model,
-          contents: prompt,
-          config: {
-            ...(options.json ? { responseMimeType: 'application/json' } : {}),
-            thinkingConfig: textThinking(model),
-          },
-        }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), timeoutMs)),
-      ])
-      const text = response.text?.trim()
-      if (text) return text
-      lastError = `${model} memulangkan jawapan kosong.`
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error)
-      console.warn(`Gemini ${model} tidak digunakan.`, lastError)
+  const askOnce = async () => {
+    let sawTimeout = false
+    let sawBusy = false
+    for (const model of TEXT_MODELS) {
+      try {
+        const response = await Promise.race([
+          ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              ...(options.json ? { responseMimeType: 'application/json' } : {}),
+              thinkingConfig: textThinking(model),
+            },
+          }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), timeoutMs)),
+        ])
+        const text = response.text?.trim()
+        if (text) return text
+        lastError = `${model} memulangkan jawapan kosong.`
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error)
+        if (/masa tamat/.test(lastError)) sawTimeout = true
+        if (geminiBusy(lastError)) sawBusy = true
+        console.warn(`Gemini ${model} tidak digunakan.`, lastError)
+      }
     }
+    return sawBusy && !sawTimeout ? '' : null
+  }
+
+  const first = await askOnce()
+  if (first) return first
+  if (first === '') {
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const second = await askOnce()
+    if (second) return second
   }
 
   throw new Error(publicGeminiError(lastError))

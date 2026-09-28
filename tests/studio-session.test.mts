@@ -93,6 +93,10 @@ test('papan cerita menerima JSON yang dibalut ayat', () => {
     assert.equal(TEXT_MODELS[0], 'gemini-3.5-flash-lite')
     assert.deepEqual(textThinking('gemini-3.5-flash'), { thinkingLevel: 'MINIMAL' })
     assert.deepEqual(textThinking('gemini-2.5-flash'), { thinkingBudget: 0 })
+    const busy = '{"error": {"code":503,"message":"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.","status":"UNAVAILABLE"}}'
+    const shown = publicGeminiError(busy)
+    assert.match(shown, /Penulis skrip sedang sibuk/)
+    assert.equal(shown.includes('{'), false)
   } finally {
     if (previous === undefined) delete process.env.GEMINI_API_KEY
     else process.env.GEMINI_API_KEY = previous
