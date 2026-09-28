@@ -10,7 +10,7 @@ import {
 } from '../src/lib/studio-session.ts'
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
-import { geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection } from '../src/lib/malay-voice.ts'
+import { TTS_MODELS, geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection, speechScript } from '../src/lib/malay-voice.ts'
 import { dressStoryboard, oneAd, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
 import { sceneOutputUrl, SCENE_MISS, restageImage } from '../src/lib/restage-image.ts'
 import { publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
@@ -120,6 +120,10 @@ test('suara lalai lelaki dan gerakan avatar licin', () => {
   assert.equal(geminiVoiceName('lelaki'), 'Charon')
   assert.equal(geminiVoiceName('perempuan'), 'Kore')
   assert.match(speechDirection('Minum ini.', 'lelaki'), /lelaki dewasa/)
+  assert.equal(TTS_MODELS[0], 'gemini-3.8-flash-lite-tts')
+  assert.equal(TTS_MODELS.includes('gemini-2.5-flash-preview-tts' as never), false)
+  assert.equal(speechScript('Minum ini.', 'lelaki', 'gemini-3.8-flash-lite-tts'), 'Minum ini.')
+  assert.match(speechScript('Minum ini.', 'lelaki', 'gemini-3.1-flash-tts-preview'), /lelaki dewasa/)
   const motion = omniHumanInput('data:image/jpeg;base64,abc', 'data:audio/wav;base64,def')
   assert.equal(motion.fast_mode, false)
   assert.match(motion.prompt, /talks naturally/)

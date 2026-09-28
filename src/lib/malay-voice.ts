@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality } from '@google/genai'
 
-const TTS_MODELS = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts']
+export const TTS_MODELS = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview']
 
 export type PresenterVoice = 'lelaki' | 'perempuan'
 
@@ -18,6 +18,11 @@ export function speechDirection(text: string, voice: PresenterVoice) {
       ? 'suara perempuan dewasa, nada tenang dan mesra'
       : 'suara lelaki dewasa, nada tenang dan mesra'
   return `Baca iklan ini dalam Bahasa Malaysia, ${tone}, sebutan jelas: ${text}`
+}
+
+export function speechScript(text: string, voice: PresenterVoice, model: string) {
+  if (model.startsWith('gemini-3.8-')) return text
+  return speechDirection(text, voice)
 }
 
 export function speechChunks(text: string, max = 180) {
@@ -84,7 +89,7 @@ async function geminiSpeech(text: string, voice: PresenterVoice): Promise<Spoken
       const response = await Promise.race([
         ai.models.generateContent({
           model,
-          contents: speechDirection(text, voice),
+          contents: speechScript(text, voice, model),
           config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
@@ -92,7 +97,7 @@ async function geminiSpeech(text: string, voice: PresenterVoice): Promise<Spoken
             },
           },
         }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), 20000)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), 12000)),
       ])
       const part = response.candidates?.[0]?.content?.parts?.find((item) => item.inlineData?.data)
       const raw = part?.inlineData?.data
