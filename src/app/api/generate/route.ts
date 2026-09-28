@@ -70,7 +70,8 @@ export async function POST(req: Request) {
     let enhancedPrompt = ''
 
     if (type === 'avatar' && imageUrl) {
-      const stagedPromise = restageImage(imageUrl, placePrompt(spokenDirection, 'orang'))
+      const sourceImage = await hostedAssetUrl(replicate, imageUrl)
+      const stagedPromise = restageImage(replicate, sourceImage, placePrompt(spokenDirection, 'orang'))
       let finalAudio = customAudio
 
       if (!finalAudio && scriptMalay) {
@@ -82,8 +83,8 @@ export async function POST(req: Request) {
       }
 
       const staged = await stagedPromise
-      const imageHosted = await asHosted(staged || imageUrl)
-      const audioHosted = await asHosted(finalAudio)
+      const imageHosted = staged
+      const audioHosted = await hostedAssetUrl(replicate, finalAudio)
 
       const createSadTalker = () =>
         replicate.predictions.create({
@@ -127,7 +128,8 @@ export async function POST(req: Request) {
       }
       let frame = typeof imageUrl === 'string' ? imageUrl : ''
       if (type === 'b-roll' && frame) {
-        frame = (await restageImage(frame, placePrompt(spokenDirection, 'produk'))) || frame
+        const sourceImage = await hostedAssetUrl(replicate, frame)
+        frame = await restageImage(replicate, sourceImage, placePrompt(spokenDirection, 'produk'))
       }
       const frameImage = frame ? await asHosted(frame) : undefined
 

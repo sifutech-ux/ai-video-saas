@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { denied, requireStudio } from '@/lib/studio-guard'
 import { fetchAllowedMedia } from '@/lib/media-url'
 import { presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
-import { stitchSceneFiles, type StitchScene } from '@/lib/ugc-stitch'
+import { publicStitchError, stitchSceneFiles, type StitchScene } from '@/lib/ugc-stitch'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -54,6 +54,6 @@ export async function POST(req: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gagal mencantumkan video.'
     console.error('Ralat cantuman video:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: publicStitchError(message) }, { status: 500 })
   }
 }

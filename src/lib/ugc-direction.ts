@@ -65,27 +65,19 @@ const LOOK: Record<UgcDirection, { avatar: string; broll: string; marker: string
 
 const BEATS: Record<UgcDirection, string> = {
   santai: `Nada: Melayu santai, seperti kawan bercakap pada kamera.
-Adegan 1 avatar: soalan hook pendek.
-Adegan 2 b-roll: masalah harian, produk belum jadi hero.
-Adegan 3 b-roll: produk menyelesaikan masalah, dekat.
-Adegan 4 avatar: ajakan santai.`,
+Adegan 1 avatar: penyampai bercakap dalam suasana santai, satu ayat.
+Adegan 2 b-roll: produk yang sama dalam suasana santai itu, satu ayat.`,
   live: `Nada: hos jualan langsung, ayat sangat pendek dan terus.
-Adegan 1 avatar: hook terus kepada penonton.
-Adegan 2 b-roll: masalah di atas meja terang.
-Adegan 3 b-roll: produk dekat di atas meja, cahaya cincin.
-Adegan 4 avatar: seruan beli sekarang.
+Adegan 1 avatar: penyampai di meja jualan terang, seruan beli sekarang.
+Adegan 2 b-roll: produk yang sama di meja jualan terang itu.
 Jangan tulis komen live atau harga pada skrin.`,
   kecantikan: `Nada: tenang, dekat, seperti demo kecantikan.
-Adegan 1 avatar: kebimbangan ringkas, suara lembut.
-Adegan 2 b-roll: tekstur, titisan, atau pek di meja solek.
-Adegan 3 b-roll: sapuan atau pek terbuka, cahaya lembut.
-Adegan 4 avatar: ajakan cuba, tenang.
+Adegan 1 avatar: penyampai di meja solek, suara lembut.
+Adegan 2 b-roll: produk yang sama di meja solek itu.
 Jangan buat rajah kulit, label anatomi, atau teks pada skrin.`,
   pelancaran: `Nada: senyap, premium, pelancaran produk baharu.
-Adegan 1 avatar: umum sesuatu yang baharu, perlahan.
-Adegan 2 b-roll: produk di atas pelamin, cahaya lembut.
-Adegan 3 b-roll: butiran pek, logo jelas.
-Adegan 4 avatar: ajak tengok produk baharu.`,
+Adegan 1 avatar: penyampai di sebelah pelamin, perlahan.
+Adegan 2 b-roll: produk di atas pelamin, cahaya lembut.`,
 }
 
 export function placePrompt(direction: UgcDirection, kind: 'orang' | 'produk') {
@@ -142,14 +134,26 @@ Hasilkan SATU objek JSON sahaja untuk produk ini:
 ${BEATS[input.direction]}
 
 Bahasa skrip: Melayu, ayat pendek, seperti bercakap pada kamera.
-Tepat 4 adegan, jenis mengikut susunan: avatar, b-roll, b-roll, avatar.
+Tepat 2 adegan sahaja: avatar, kemudian b-roll.
 visualPrompt dalam bahasa Inggeris, satu ayat.
-Orang dan produk kedua-duanya berada dalam suasana arah ini. Kekalkan muka orang dan rupa pek produk.
-Klip orang: penyampai di dalam scene arah ini.
-Klip produk: pek produk di dalam scene arah yang sama.
+Penyampai dan produk berada dalam scene yang sama. Kekalkan muka orang dan rupa pek produk.
 
 Bentuk JSON:
-{"title":"tajuk","scenes":[{"sceneNumber":1,"type":"avatar","title":"Hook (0-3s)","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":2,"type":"b-roll","title":"Masalah (3-6s)","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":3,"type":"b-roll","title":"Penyelesaian (6-9s)","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":4,"type":"avatar","title":"Call To Action (9-12s)","scriptMalay":"...","visualPrompt":"..."}]}`
+{"title":"tajuk","scenes":[{"sceneNumber":1,"type":"avatar","title":"Penyampai","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":2,"type":"b-roll","title":"Produk","scriptMalay":"...","visualPrompt":"..."}]}`
+}
+
+export function oneAd<T extends { scenes?: Array<{ type?: string; title?: string; sceneNumber?: number }> }>(board: T): T {
+  const scenes = Array.isArray(board.scenes) ? board.scenes : []
+  const avatar = scenes.find((scene) => scene.type === 'avatar') ?? scenes[0]
+  const product = scenes.find((scene) => scene.type === 'b-roll') ?? scenes.find((scene) => scene !== avatar)
+  if (!avatar || !product) return board
+  return {
+    ...board,
+    scenes: [
+      { ...avatar, sceneNumber: 1, type: 'avatar', title: 'Penyampai' },
+      { ...product, sceneNumber: 2, type: 'b-roll', title: 'Produk' },
+    ],
+  }
 }
 
 export function dressStoryboard<T extends { scenes?: Array<{ type?: string; visualPrompt?: string }> }>(

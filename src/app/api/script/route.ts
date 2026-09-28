@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { denied, requireStudio } from '@/lib/studio-guard'
 import { askGemini, geminiKey, parseStoryboard, publicGeminiError } from '@/lib/gemini-text'
-import { dressStoryboard, scriptPrompt, ugcDirection } from '@/lib/ugc-direction'
+import { dressStoryboard, oneAd, scriptPrompt, ugcDirection } from '@/lib/ugc-direction'
 
 export const maxDuration = 30
 export const runtime = 'nodejs'
@@ -25,7 +25,8 @@ export async function POST(req: Request) {
     }
 
     const text = await askGemini(scriptPrompt({ productName, productBenefits, targetAudience, direction }), { json: true })
-    return NextResponse.json({ success: true, data: dressStoryboard(parseStoryboard(text), direction), direction })
+    const board = dressStoryboard(oneAd(parseStoryboard(text)), direction)
+    return NextResponse.json({ success: true, data: board, direction })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gagal menjana skrip UGC.'
     console.error('Ralat API Script:', message)
