@@ -129,6 +129,7 @@ export default function UgcStoryboard() {
         prompt: scene.visualPrompt,
         aspectRatio: '9:16',
         imageUrl: avatarFromNote ? undefined : selectedImage,
+        productImageUrl: scene.type === 'avatar' ? productImage : undefined,
         presenter: scene.type === 'avatar' ? presenterSource : undefined,
         gambaran: avatarFromNote ? avatarNote.trim() : undefined,
         type: scene.type,
@@ -217,7 +218,7 @@ export default function UgcStoryboard() {
           UGC Script & Storyboard
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Pilih muka dari gambar, atau tulis gambaran avatar. Gambar produk tetap wajib. Satu iklan siap dalam beberapa minit.
+          Pilih muka dari gambar, atau tulis gambaran avatar. Penyampai memegang produk, dan skrip habis disebut. Gambar produk tetap wajib. Satu iklan siap dalam beberapa minit.
         </p>
       </div>
 
@@ -273,7 +274,7 @@ export default function UgcStoryboard() {
                 placeholder="Contoh: lelaki dewasa 28 tahun, kemeja navy, rambut pendek"
                 className="w-full min-h-24 bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
               />
-              <p className="text-[11px] text-slate-500">Orang dewasa sahaja. Jantina, umur, dan baju. AI cipta orang itu dalam scene arah yang dipilih.</p>
+              <p className="text-[11px] text-slate-500">Orang dewasa sahaja. Jantina, umur, dan baju. AI cipta orang itu dalam scene arah yang dipilih, memegang produk.</p>
             </>
           )}
         </div>

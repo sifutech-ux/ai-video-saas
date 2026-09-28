@@ -9,10 +9,10 @@ const MINOR_WORD =
   /\b(child|children|kid|kids|toddler|toddlers|baby|babies|infant|infants|minor|minors|underage|preteen|preteens|teenager|teenagers|teen|teens|schoolgirl|schoolboy|loli|shota|budak|bayi|remaja|kanak-kanak|tadika|kindergarten)\b|kanak\s*kanak|anak\s*kecil|anak-anak|bawah\s*18|under\s*18|kurang\s*dari\s*18|sekolah\s*rendah/i
 
 const SCENE: Record<UgcDirection, string> = {
-  santai: 'in a simple bright room, casual UGC tabletop behind them',
-  live: 'at a bright live-selling table with a ring light',
-  kecantikan: 'in a soft vanity close-up',
-  pelancaran: 'beside a premium product pedestal in soft light',
+  santai: 'in a simple quiet room, casual UGC tabletop, one plain table, no crowd',
+  live: 'behind one plain table with one soft ring light, bright live-selling table, a simple quiet room, no shop, no crowd',
+  kecantikan: 'in a soft vanity close-up at a simple dressing table, no crowd',
+  pelancaran: 'beside a premium product pedestal in soft light, a quiet room, no crowd',
 }
 
 export function presenterMode(value: unknown): 'muka' | 'avatar' {
@@ -40,5 +40,5 @@ export function adultAvatarNote(value: unknown) {
 
 export function avatarStillPrompt(direction: UgcDirection, note: string) {
   const clean = adultAvatarNote(note)
-  return `Photorealistic photo of one adult person only, ${SCENE[direction]}. The adult matches this description: ${clean}. Waist-up, looking at the camera, natural skin, real photograph. Adult, not a child. Vertical 9:16. No text, no logo, no extra people.`
+  return `Photoreal live-action phone photo, vertical 9:16, of one adult person only, ${SCENE[direction]}. The adult matches this description exactly, including the clothes: ${clean}. If the description says a shirt or kemeja, it is a button shirt, not a t-shirt. Waist-up, looking at the camera, both hands empty and visible. Natural skin with pores, real hair, real fabric, realistic hands. Soft real lighting. Adult, not a child. No plastic skin, no illustration, no crowd, no signs, no screens, no readable text, no logo, no watermark, no extra people.`
 }

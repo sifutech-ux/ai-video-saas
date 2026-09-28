@@ -11,9 +11,9 @@ import {
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { TTS_MODELS, geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection, speechScript } from '../src/lib/malay-voice.ts'
-import { dressStoryboard, localAd, oneAd, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
-import { sceneOutputUrl, SCENE_MISS, restageImage, createAvatarStill, AVATAR_STILL_MISS, AVATAR_STILL_MODEL } from '../src/lib/restage-image.ts'
-import { publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
+import { dressStoryboard, fitSpokenLine, localAd, oneAd, placePrompt, PRESENTER_WORDS, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
+import { sceneOutputUrl, SCENE_MISS, restageImage, createAvatarStill, holdProduct, HOLD_MISS, HOLD_MODEL, AVATAR_STILL_MISS, AVATAR_STILL_MODEL } from '../src/lib/restage-image.ts'
+import { framePadSeconds, publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
 import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import {
@@ -201,6 +201,14 @@ test('arah iklan menukar skrip dan klip produk', () => {
   assert.match(spare.scenes[0].scriptMalay, /beli sekarang/)
   assert.match(spare.scenes[0].visualPrompt, /bright live-selling table/i)
   assert.match(spare.scenes[1].scriptMalay, /Lemon/)
+  const spoken = fitSpokenLine(`${'Ayat jualan yang panjang ini. '.repeat(12)}`, PRESENTER_WORDS)
+  assert.ok(spoken.split(' ').filter(Boolean).length <= PRESENTER_WORDS)
+  assert.match(spoken, /[.!?…]$/)
+  const dressedLong = dressStoryboard(
+    { scenes: [{ type: 'avatar', scriptMalay: `${'Satu. '.repeat(40)}`, visualPrompt: 'A man talks.' }] },
+    'live'
+  )
+  assert.ok((dressedLong.scenes[0].scriptMalay || '').split(' ').filter(Boolean).length <= PRESENTER_WORDS)
 })
 
 test('scene baharu hanya diterima dari pautan https', async () => {
@@ -300,6 +308,31 @@ test('dua klip dicantum menjadi satu video', () => {
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
+test('suara yang lebih panjang tidak dipotong di hujung klip', () => {
+  assert.equal(framePadSeconds(1, 3), 2)
+  assert.equal(framePadSeconds(5, 5.1), 0)
+  assert.equal(framePadSeconds(0, 4), 0)
+  assert.ok(ffmpegPath)
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ugc-pad-'))
+  const clip = path.join(dir, 'short.mp4')
+  execFileSync(ffmpegPath as string, [
+    '-y', '-f', 'lavfi', '-i', 'color=c=blue:s=320x568:d=1',
+    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', clip,
+  ], { stdio: 'pipe' })
+  const video = fs.readFileSync(clip)
+  const output = stitchSceneFiles([
+    { video, audio: pcmToWav(Buffer.alloc(24000 * 2 * 2)) },
+    { video },
+  ])
+  const heard = spawnSync(ffmpegPath as string, ['-i', 'pipe:0', '-f', 'null', '-'], { input: output })
+  const duration = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(heard.stderr?.toString() || '')
+  assert.ok(duration)
+  const seconds = Number(duration?.[1]) * 3600 + Number(duration?.[2]) * 60 + Number(duration?.[3])
+  assert.ok(seconds > 2.6, String(seconds))
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
 test('avatar AI cipta orang dewasa dalam scene, muka gambar kekal lalai', async () => {
   assert.equal(presenterMode(undefined), 'muka')
   assert.equal(presenterMode('muka'), 'muka')
@@ -315,6 +348,8 @@ test('avatar AI cipta orang dewasa dalam scene, muka gambar kekal lalai', async 
   const live = avatarStillPrompt('live', 'lelaki dewasa 28 tahun, kemeja navy, rambut pendek')
   assert.match(live, /bright live-selling table/)
   assert.match(live, /kemeja navy/)
+  assert.match(live, /Natural skin/)
+  assert.match(live, /no crowd/)
   assert.match(live, /Adult, not a child/)
   assert.match(live, /9:16/)
   assert.match(avatarStillPrompt('kecantikan', 'perempuan dewasa 32 tahun, blouse putih'), /soft vanity close-up/)
@@ -343,6 +378,47 @@ test('avatar AI cipta orang dewasa dalam scene, muka gambar kekal lalai', async 
   assert.equal(seen?.input?.aspect_ratio, '9:16')
   assert.equal(seen?.input?.input_image, undefined)
   assert.match(String(seen?.input?.prompt), /bright live-selling table/)
+  assert.equal(seen?.input?.go_fast, undefined)
+
+  let held: { model?: string; input?: Record<string, unknown> } | null = null
+  const hand = await holdProduct(
+    {
+      predictions: {
+        async create(body) {
+          held = body
+          return { id: 'hand', status: 'succeeded', output: 'https://replicate.delivery/hand.jpg' }
+        },
+        async get() {
+          return { id: 'hand', status: 'failed' }
+        },
+      },
+    },
+    'https://replicate.delivery/person.jpg',
+    'https://replicate.delivery/pack.jpg'
+  )
+  assert.equal(hand, 'https://replicate.delivery/hand.jpg')
+  assert.equal(held?.model, HOLD_MODEL)
+  assert.equal(held?.input?.input_image_1, 'https://replicate.delivery/person.jpg')
+  assert.equal(held?.input?.input_image_2, 'https://replicate.delivery/pack.jpg')
+  assert.equal(held?.input?.aspect_ratio, '9:16')
+  assert.match(String(held?.input?.prompt), /exact product pack/)
+  await assert.rejects(
+    () => holdProduct(
+      {
+        predictions: {
+          async create() {
+            return { id: 'hand', status: 'succeeded', output: 'https://replicate.delivery/hand.jpg' }
+          },
+          async get() {
+            return { id: 'hand', status: 'succeeded' }
+          },
+        },
+      },
+      'data:image/jpeg;base64,abc',
+      'https://replicate.delivery/pack.jpg'
+    ),
+    new RegExp(HOLD_MISS)
+  )
 
   await assert.rejects(
     () => createAvatarStill(

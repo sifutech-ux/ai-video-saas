@@ -13,7 +13,7 @@ export function omniHumanInput(image: string, audio: string, direction: keyof ty
   return {
     image,
     audio,
-    prompt: `The person in this photo speaks to the camera. Keep this exact face, clothes, and background. They look at the camera, ${energy}. Smooth head and shoulder movement, continuous lip movement, one continuous shot, no jump cuts.`,
+    prompt: `The person in this photo speaks to the camera while holding the product pack. Keep this exact face, clothes, product pack, and background. They look at the camera, ${energy}. Natural skin, real hands on the pack, smooth head and shoulder movement, continuous lip movement, one continuous shot, no jump cuts.`,
     fast_mode: false,
   }
 }

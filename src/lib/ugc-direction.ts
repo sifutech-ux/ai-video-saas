@@ -84,25 +84,25 @@ export function placePrompt(direction: UgcDirection, kind: 'orang' | 'produk') {
   const place = {
     santai: {
       orang:
-        'Place this same person in a simple bright room, casual UGC tabletop behind them, waist-up, looking at the camera. Keep the face identical. Vertical 9:16. No text.',
+        'Place this same adult in a simple quiet room, casual UGC tabletop behind them, waist-up, looking at the camera. Natural skin with pores, real fabric, both hands visible and empty. No crowd, no signs. Keep the face identical. Vertical 9:16. No text.',
       produk:
         'Place this exact product pack on a simple table in soft daylight, casual UGC tabletop. Keep the pack and logo identical. Vertical 9:16. No text.',
     },
     live: {
       orang:
-        'Place this same person at a bright live-selling table with a ring light, waist-up, looking at the camera. Keep the face identical. Vertical 9:16. No text, no comments, no prices.',
+        'Place this same adult at a bright live-selling table with one soft ring light, in a simple quiet room, waist-up, looking at the camera. Natural skin with pores, real fabric, both hands visible and empty. No crowd, no shop, no signs. Keep the face identical. Vertical 9:16. No text, no comments, no prices.',
       produk:
         'Place this exact product pack on a bright live-selling table under a ring light, close. Keep the pack and logo identical. Vertical 9:16. No text, no comments.',
     },
     kecantikan: {
       orang:
-        'Place this same person at a soft vanity close-up, gentle, looking at the camera. Keep the face identical. Vertical 9:16. No text, no skin diagram.',
+        'Place this same adult in a soft vanity close-up, gentle, looking at the camera. Natural skin with pores, real fabric, both hands visible and empty. No crowd, no signs. Keep the face identical. Vertical 9:16. No text, no skin diagram.',
       produk:
         'Place this exact product pack on a soft vanity close-up, texture visible. Keep the pack and logo identical. Vertical 9:16. No text, no skin diagram.',
     },
     pelancaran: {
       orang:
-        'Place this same person beside a premium product pedestal, soft light, waist-up, looking at the camera. Keep the face identical. Vertical 9:16. No text.',
+        'Place this same adult beside a premium product pedestal, soft light, waist-up, looking at the camera. Natural skin with pores, real fabric, both hands visible and empty. No crowd, no signs. Keep the face identical. Vertical 9:16. No text.',
       produk:
         'Place this exact product pack on a premium product pedestal, soft light, pack and logo clear. Keep the pack identical. Vertical 9:16. No text.',
     },
@@ -135,6 +135,8 @@ ${BEATS[input.direction]}
 
 Bahasa skrip: Melayu, ayat pendek, seperti bercakap pada kamera.
 Tepat 2 adegan sahaja: avatar, kemudian b-roll.
+Penyampai memegang pek produk. Skrip penyampai paling banyak 2 ayat dan bawah 32 patah perkataan, mesti habis disebut.
+Skrip produk 1 ayat dan bawah 14 patah perkataan, mesti habis disebut.
 visualPrompt dalam bahasa Inggeris, satu ayat.
 Penyampai dan produk berada dalam scene yang sama. Kekalkan muka orang dan rupa pek produk.
 
@@ -179,6 +181,26 @@ export function localAd(input: { productName: string; productBenefits: string; d
   }
 }
 
+export const PRESENTER_WORDS = 32
+export const PRODUCT_WORDS = 14
+
+export function fitSpokenLine(text: string, maxWords: number) {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (!clean) return ''
+  const words = clean.split(' ').filter(Boolean)
+  if (words.length <= maxWords) return clean
+  const sentences = clean.split(/(?<=[.!?…])\s+/)
+  let chosen = ''
+  for (const sentence of sentences) {
+    const next = chosen ? `${chosen} ${sentence}` : sentence
+    if (next.split(' ').filter(Boolean).length > maxWords) break
+    chosen = next
+  }
+  if (chosen) return chosen
+  const cut = words.slice(0, maxWords).join(' ')
+  return /[.!?…]$/.test(cut) ? cut : `${cut}.`
+}
+
 export function oneAd<T extends { scenes?: Array<{ type?: string; title?: string; sceneNumber?: number }> }>(board: T): T {
   const scenes = Array.isArray(board.scenes) ? board.scenes : []
   const avatar = scenes.find((scene) => scene.type === 'avatar') ?? scenes[0]
@@ -193,20 +215,25 @@ export function oneAd<T extends { scenes?: Array<{ type?: string; title?: string
   }
 }
 
-export function dressStoryboard<T extends { scenes?: Array<{ type?: string; visualPrompt?: string }> }>(
+export function dressStoryboard<T extends { scenes?: Array<{ type?: string; visualPrompt?: string; scriptMalay?: string }> }>(
   board: T,
   direction: UgcDirection
 ): T {
   const scenes = Array.isArray(board.scenes) ? board.scenes : []
   return {
     ...board,
-    scenes: scenes.map((scene) => ({
-      ...scene,
-      visualPrompt: withDirectionLook(
-        typeof scene.visualPrompt === 'string' ? scene.visualPrompt : '',
-        direction,
-        scene.type === 'b-roll' ? 'b-roll' : 'avatar'
-      ),
-    })),
+    scenes: scenes.map((scene) => {
+      const productLine = scene.type === 'b-roll'
+      const script = typeof scene.scriptMalay === 'string' ? scene.scriptMalay : undefined
+      return {
+        ...scene,
+        ...(script !== undefined ? { scriptMalay: fitSpokenLine(script, productLine ? PRODUCT_WORDS : PRESENTER_WORDS) } : {}),
+        visualPrompt: withDirectionLook(
+          typeof scene.visualPrompt === 'string' ? scene.visualPrompt : '',
+          direction,
+          productLine ? 'b-roll' : 'avatar'
+        ),
+      }
+    }),
   }
 }
