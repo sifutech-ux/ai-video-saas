@@ -6,7 +6,7 @@
   --muted: #9aa2bd;
   --card: rgba(255, 255, 255, 0.045);
   --line: rgba(255, 255, 255, 0.09);
-  --video: #ff7ab8;
+  --video: #b28bff;
   --background: var(--bg);
   --foreground: var(--text);
 }
@@ -19,7 +19,7 @@ body {
   background:
     radial-gradient(900px 500px at 50% -10%, rgba(124, 156, 255, 0.25), transparent 60%),
     radial-gradient(700px 500px at 100% 10%, rgba(178, 139, 255, 0.18), transparent 55%),
-    radial-gradient(700px 500px at 0% 20%, rgba(255, 122, 184, 0.12), transparent 55%),
+    radial-gradient(700px 500px at 0% 20%, rgba(178, 139, 255, 0.16), transparent 55%),
     var(--bg);
 }
 
@@ -43,11 +43,11 @@ body {
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: var(--video);
+  background: linear-gradient(135deg, #7c9cff, #b28bff);
 }
 
 .bs-btn {
-  background: var(--video) !important;
+  background: linear-gradient(135deg, #7c9cff, #b28bff) !important;
   color: #0a0f1f !important;
   border: 0 !important;
   border-radius: 999px !important;
@@ -66,7 +66,7 @@ body {
 }
 
 .bs-on {
-  background: rgba(255, 122, 184, 0.16) !important;
+  background: rgba(178, 139, 255, 0.2) !important;
   border-color: var(--video) !important;
-  color: #ffd0e6 !important;
+  color: #efe7ff !important;
 }
