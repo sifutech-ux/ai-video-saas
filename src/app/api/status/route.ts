@@ -13,7 +13,11 @@ export async function GET(req: Request) {
 
   try {
     const prediction = await replicate.predictions.get(id)
-    return NextResponse.json(prediction)
+    return NextResponse.json({
+      status: prediction.status,
+      output: prediction.output,
+      error: prediction.error,
+    })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

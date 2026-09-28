@@ -1,50 +1,82 @@
 import { NextResponse } from 'next/server'
 import Replicate from 'replicate'
+import { denied, requireStudio } from '@/lib/studio-guard'
+import { writeSession } from '@/lib/studio-cookie'
+import { rememberJob, START_CREDITS } from '@/lib/studio-session'
+import { cleanAspect, directStudioPrompt } from '@/lib/studio-prompt'
 
-const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! })
+const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
+
+function publicGenerateError(message: string) {
+  if (/authentication token|Unauthenticated/i.test(message)) {
+    return 'Pelayan video belum disambungkan. Kredit tidak ditolak.'
+  }
+  const clean = message.replace(/\s+/g, ' ').trim()
+  if (clean.startsWith('Sila ')) return clean
+  return clean.length > 240 ? `${clean.slice(0, 240)}…` : clean
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function POST(req: Request) {
+  const session = await requireStudio()
+  if (denied(session)) return session
+
+  let charged = false
+
   try {
-    const { prompt, aspectRatio, imageUrl, type, scriptMalay, customAudio } = await req.json()
+    const body = await req.json()
+    const { prompt, aspectRatio, imageUrl, type, scriptMalay, customAudio, style } = body
 
     if (!imageUrl && type === 'avatar') {
       return NextResponse.json({ error: 'Sila muat naik Gambar Avatar!' }, { status: 400 })
     }
 
-    let prediction;
+    const studio = !type
+    if (studio && !prompt && !imageUrl) {
+      return NextResponse.json({ error: 'Sila masukkan prompt teks atau muat naik gambar.' }, { status: 400 })
+    }
+    if (typeof imageUrl === 'string' && imageUrl.length > 2_500_000) {
+      return NextResponse.json({ error: 'Gambar terlalu besar. Sila guna gambar yang lebih kecil.' }, { status: 413 })
+    }
+
+    if (studio) {
+      if (session.credits < 1) {
+        return NextResponse.json({ error: 'Baki kredit tidak mencukupi.', credits: session.credits }, { status: 402 })
+      }
+      session.credits -= 1
+      charged = true
+    }
+
+    let prediction
+    let enhancedPrompt = ''
 
     if (type === 'avatar' && imageUrl) {
       let finalAudio = customAudio
 
-      // Fallback ke Google TTS jika tiada audio sendiri dimuat naik
       if (!finalAudio && scriptMalay) {
         const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(scriptMalay)}&tl=ms&client=tw-ob`
         const audioRes = await fetch(ttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        
         if (!audioRes.ok) throw new Error('Gagal memuat turun audio TTS')
-        
         const audioBuffer = await audioRes.arrayBuffer()
         finalAudio = `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`
       }
 
       if (!finalAudio) {
-        return NextResponse.json({ error: 'Sila muat naik fail audio suara atau sediakan skrip!' }, { status: 400 })
+        throw new Error('Sila muat naik fail audio suara atau sediakan skrip!')
       }
 
-      // Tetapan Paling Selamat: preprocess "full"
       const createAvatarPrediction = async (retryCount = 0): Promise<any> => {
         try {
           return await replicate.predictions.create({
-            version: "3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376",
+            version: '3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376',
             input: {
               source_image: imageUrl,
               driven_audio: finalAudio,
-              enhancer: "gfpgan",
-              preprocess: "full", // Tetapan paling stabil & muka kekal asal
+              enhancer: 'gfpgan',
+              preprocess: 'full',
               still: false,
-            }
+            },
           })
         } catch (err: any) {
           if ((err?.status === 429 || err?.message?.includes('429')) && retryCount < 2) {
@@ -57,31 +89,53 @@ export async function POST(req: Request) {
 
       prediction = await createAvatarPrediction()
     } else {
-      // ADEGAN PRODUK (B-ROLL MINIMAX)
-      let finalPrompt = prompt
+      const aspect = cleanAspect(aspectRatio)
+      if (studio) {
+        enhancedPrompt = await directStudioPrompt({
+          prompt: typeof prompt === 'string' ? prompt : '',
+          style: typeof style === 'string' ? style : 'Cinematic',
+          aspectRatio: aspect,
+        })
+      }
+      let finalPrompt = enhancedPrompt || (typeof prompt === 'string' ? prompt : '')
       if (imageUrl) {
-        finalPrompt = `${prompt}, subtle natural movement, continuous shot, high quality, photorealistic, preserve original image details.`
+        finalPrompt = `${finalPrompt} Subtle natural movement, continuous shot, preserve the reference image.`
       }
 
       prediction = await replicate.predictions.create({
-        model: "minimax/video-01",
+        model: 'minimax/video-01',
         input: {
           prompt: finalPrompt,
-          aspect_ratio: aspectRatio || '9:16',
+          aspect_ratio: aspect,
           prompt_optimizer: false,
           first_frame_image: imageUrl || undefined,
         },
       })
     }
 
+    if (!prediction?.id) throw new Error('Pelayan video tidak memulangkan nombor tugasan.')
+    if (studio) {
+      rememberJob(session, prediction.id)
+      await writeSession(session)
+    }
+
     return NextResponse.json({
       success: true,
       jobId: prediction.id,
       status: prediction.status,
+      enhancedPrompt,
+      credits: session.credits,
     })
-
   } catch (error: any) {
-    console.error('Ralat API Generate:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('Ralat API Generate:', error instanceof Error ? error.message : error)
+    if (charged) {
+      session.credits = Math.min(START_CREDITS, session.credits + 1)
+      await writeSession(session)
+    }
+    const message = publicGenerateError(error?.message || 'Penjanaan gagal.')
+    return NextResponse.json(
+      { error: message, credits: session.credits },
+      { status: message.startsWith('Sila ') ? 400 : 500 }
+    )
   }
 }

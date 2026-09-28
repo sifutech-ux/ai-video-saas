@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { denied, requireStudio } from '@/lib/studio-guard'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function POST(req: Request) {
+  const session = await requireStudio()
+  if (denied(session)) return session
+
   try {
     const { productName, productBenefits, targetAudience } = await req.json()
 
