@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality } from '@google/genai'
 
-const TTS_MODELS = ['gemini-2.5-flash-preview-tts', 'gemini-2.5-flash-tts']
+const TTS_MODELS = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts']
 
 export function speechChunks(text: string, max = 180) {
   const clean = text.replace(/\s+/g, ' ').trim()

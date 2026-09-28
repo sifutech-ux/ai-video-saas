@@ -11,6 +11,7 @@ import {
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { pcmToWav, speechChunks } from '../src/lib/malay-voice.ts'
+import { parseStoryboard, publicGeminiError } from '../src/lib/gemini-text.ts'
 import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
 import { execFileSync } from 'node:child_process'
 import ffmpegPath from 'ffmpeg-static'
@@ -72,6 +73,22 @@ test('muat turun hanya benarkan hos Replicate', () => {
   assert.equal(allowedMediaUrl('https://example.com/file.mp4'), false)
   assert.equal(allowedMediaUrl('http://replicate.delivery/file.mp4'), false)
   assert.equal(allowedMediaUrl('not a url'), false)
+})
+
+test('papan cerita menerima JSON yang dibalut ayat', () => {
+  const board = parseStoryboard('Ini dia:\n{"title":"Lemon","scenes":[{"sceneNumber":1},{"sceneNumber":2}]}')
+  assert.equal(board.title, 'Lemon')
+  assert.equal(board.scenes?.length, 2)
+  assert.throws(() => parseStoryboard('tiada json'))
+  const previous = process.env.GEMINI_API_KEY
+  process.env.GEMINI_API_KEY = 'ujian'
+  try {
+    assert.match(publicGeminiError('models/gemini-2.5-flash is not found'), /Model Gemini lama/)
+  } finally {
+    if (previous === undefined) delete process.env.GEMINI_API_KEY
+    else process.env.GEMINI_API_KEY = previous
+  }
+  assert.match(publicGeminiError(''), /belum ditetapkan/)
 })
 
 test('skrip panjang dipecahkan supaya suara tidak terputus', () => {
