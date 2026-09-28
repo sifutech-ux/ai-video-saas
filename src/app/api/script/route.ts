@@ -67,7 +67,7 @@ Format Output (WAJIB dalam format JSON SAHAJA, tanpa sebarang teks tambahan):
 }`
 
     // Senarai model stabil untuk dicuba berturut-turut jika berlaku 503 / 429
-    const candidateModels = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash']
+    const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash']
     let responseText = ''
     let lastError: any = null
 

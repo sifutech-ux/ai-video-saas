@@ -1,28 +1,26 @@
 import { NextResponse } from 'next/server'
 import { denied, requireStudio } from '@/lib/studio-guard'
+import { synthesizeMalay } from '@/lib/malay-voice'
+
+export const maxDuration = 30
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   const session = await requireStudio()
   if (denied(session)) return session
 
   try {
-    const { text } = await req.json()
-
-    if (!text) {
-      return NextResponse.json({ error: 'Sila masukkan teks!' }, { status: 400 })
-    }
-
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ms&client=tw-ob`
-
-    return NextResponse.json({
-      success: true,
-      audioUrl: ttsUrl,
+    const body = await req.json().catch(() => ({}))
+    const text = typeof body.text === 'string' ? body.text : ''
+    const audio = await synthesizeMalay(text)
+    return new NextResponse(new Uint8Array(audio.buffer), {
+      headers: {
+        'Content-Type': audio.mime,
+        'Cache-Control': 'private, no-store',
+      },
     })
-  } catch (error: any) {
-    console.error('Ralat API TTS:', error)
-    return NextResponse.json(
-      { error: 'Gagal menjana audio suara: ' + error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Gagal menjana audio suara.'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

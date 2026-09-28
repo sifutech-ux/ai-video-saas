@@ -10,6 +10,13 @@ import {
 } from '../src/lib/studio-session.ts'
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
+import { pcmToWav, speechChunks } from '../src/lib/malay-voice.ts'
+import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
+import { execFileSync } from 'node:child_process'
+import ffmpegPath from 'ffmpeg-static'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 test('kata laluan yang sama lulus, yang lain gagal', () => {
   assert.equal(sameSecret('studio-rahsia', 'studio-rahsia'), true)
@@ -65,4 +72,34 @@ test('muat turun hanya benarkan hos Replicate', () => {
   assert.equal(allowedMediaUrl('https://example.com/file.mp4'), false)
   assert.equal(allowedMediaUrl('http://replicate.delivery/file.mp4'), false)
   assert.equal(allowedMediaUrl('not a url'), false)
+})
+
+test('skrip panjang dipecahkan supaya suara tidak terputus', () => {
+  const chunks = speechChunks('Ayat pertama yang pendek. ' + 'B'.repeat(200) + '. Ayat akhir sekali.')
+  assert.ok(chunks.length >= 3)
+  assert.ok(chunks.every((chunk) => chunk.length <= 180))
+  const wav = pcmToWav(Buffer.alloc(200, 1))
+  assert.equal(wav.subarray(0, 4).toString(), 'RIFF')
+  assert.equal(wav.length, 244)
+})
+
+test('dua klip dicantum menjadi satu video', () => {
+  assert.ok(ffmpegPath)
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ugc-test-'))
+  const makeClip = (name: string, color: string) => {
+    const file = path.join(dir, name)
+    execFileSync(ffmpegPath as string, [
+      '-y', '-f', 'lavfi', '-i', `color=c=${color}:s=320x568:d=1`,
+      '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+      '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', file,
+    ], { stdio: 'pipe' })
+    return fs.readFileSync(file)
+  }
+  const output = stitchSceneFiles([
+    { video: makeClip('a.mp4', 'blue') },
+    { video: makeClip('b.mp4', 'purple'), audio: pcmToWav(Buffer.alloc(4800)) },
+  ])
+  assert.ok(output.length > 1000)
+  assert.equal(output.subarray(4, 8).toString(), 'ftyp')
+  fs.rmSync(dir, { recursive: true, force: true })
 })

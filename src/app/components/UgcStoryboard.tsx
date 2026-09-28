@@ -94,47 +94,68 @@ export default function UgcStoryboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      const data = await res.json()
-      if (data.audioUrl) {
-        const audio = new Audio(data.audioUrl)
-        audio.play()
-      } else {
-        alert('Gagal mendapatkan fail audio.')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Gagal mendapatkan fail audio.')
       }
-    } catch (err) {
-      alert('Ralat memainkan audio suara.')
+      const url = URL.createObjectURL(await res.blob())
+      const audio = new Audio(url)
+      audio.onended = () => URL.revokeObjectURL(url)
+      await audio.play()
+    } catch (err: any) {
+      alert(err.message || 'Ralat memainkan audio suara.')
     }
   }
 
-  const pollSceneStatus = async (jobId: string, sceneNumber: number) => {
+  const pollSceneStatus = (jobId: string, sceneNumber: number) => {
+    const started = Date.now()
+    let misses = 0
     const interval = setInterval(async () => {
+      if (Date.now() - started > 8 * 60 * 1000) {
+        clearInterval(interval)
+        setSceneStates((prev) => ({
+          ...prev,
+          [sceneNumber]: { isGenerating: false, status: 'Masa tamat', url: '' },
+        }))
+        return
+      }
       try {
         const res = await fetch(`/api/status?id=${jobId}`)
         const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Status tidak dapat disemak')
+        misses = 0
 
         if (data.status === 'succeeded') {
           clearInterval(interval)
           const url = Array.isArray(data.output) ? data.output[0] : data.output
           setSceneStates((prev) => ({
             ...prev,
-            [sceneNumber]: { isGenerating: false, status: '🎉 Siap!', url },
+            [sceneNumber]: { isGenerating: false, status: 'Siap', url },
           }))
-        } else if (data.status === 'failed') {
+        } else if (data.status === 'failed' || data.status === 'canceled') {
           clearInterval(interval)
           const errorMsg = data.error || 'Penjanaan video gagal di pelayan AI.'
           alert(`Ralat Adegan ${sceneNumber}: ${errorMsg}`)
           setSceneStates((prev) => ({
             ...prev,
-            [sceneNumber]: { isGenerating: false, status: '❌ Gagal', url: '' },
+            [sceneNumber]: { isGenerating: false, status: 'Gagal', url: '' },
           }))
         } else {
           setSceneStates((prev) => ({
             ...prev,
-            [sceneNumber]: { ...prev[sceneNumber], status: `🔄 ${data.status}...` },
+            [sceneNumber]: { ...prev[sceneNumber], status: `${data.status}...` },
           }))
         }
       } catch (err) {
-        console.error('Ralat status adegan:', err)
+        misses += 1
+        if (misses >= 5) {
+          clearInterval(interval)
+          console.error('Ralat status adegan:', err)
+          setSceneStates((prev) => ({
+            ...prev,
+            [sceneNumber]: { isGenerating: false, status: 'Sambungan terputus', url: '' },
+          }))
+        }
       }
     }, 4000)
   }
@@ -273,8 +294,8 @@ export default function UgcStoryboard() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-pink-400 flex justify-between">
-            <span>📦 Gambar Produk (Opsional)</span>
+          <label className="text-xs font-semibold text-purple-400 flex justify-between">
+            <span>Gambar Produk (Opsional)</span>
             {productImage && (
               <button onClick={() => setProductImage(null)} className="text-[10px] text-red-400 hover:underline">Padam</button>
             )}
@@ -283,13 +304,13 @@ export default function UgcStoryboard() {
           {!productImage ? (
             <div
               onClick={() => productInputRef.current?.click()}
-              className="border border-dashed border-slate-800 hover:border-pink-500 p-3 rounded-xl cursor-pointer text-center bg-slate-900 transition"
+              className="border border-dashed border-slate-800 hover:border-purple-500 p-3 rounded-xl cursor-pointer text-center bg-slate-900 transition"
             >
               <span className="text-base block mb-1">🎁</span>
               <p className="text-xs text-slate-400">Muat naik gambar rujukan produk/pek</p>
             </div>
           ) : (
-            <div className="w-full h-48 bg-black/60 rounded-lg p-1 border border-pink-500 flex items-center justify-center">
+            <div className="w-full h-48 bg-black/60 rounded-lg p-1 border border-purple-500 flex items-center justify-center">
               <img src={productImage} alt="Produk" className="max-h-full max-w-full object-contain rounded" />
             </div>
           )}
@@ -346,7 +367,7 @@ export default function UgcStoryboard() {
             <div>
               <h3 className="text-sm font-bold text-amber-400">📋 {scriptData.title}</h3>
               <p className="text-[11px] text-slate-400">
-                {completedCount}/4 adegan sedia.
+                {completedCount}/4 adegan sedia. Setiap klip dijana berasingan. Angka kredit di atas untuk tab Studio.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -449,7 +470,7 @@ export default function UgcStoryboard() {
                         disabled={state.isGenerating}
                         className="w-full py-2 bg-slate-800 hover:bg-purple-600 text-slate-200 font-semibold rounded-lg text-xs transition border border-slate-700 disabled:opacity-50"
                       >
-                        {state.isGenerating ? state.status : `🎬 Jana Klip Adegan ${scene.sceneNumber} (1 Kredit)`}
+                        {state.isGenerating ? state.status : `Jana Klip Adegan ${scene.sceneNumber}`}
                       </button>
                     )}
                   </div>
