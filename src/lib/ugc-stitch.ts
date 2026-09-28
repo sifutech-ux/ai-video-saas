@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process'
+import { execFileSync, spawnSync } from 'child_process'
 import ffmpegPath from 'ffmpeg-static'
 import fs from 'fs'
 import os from 'os'
@@ -36,6 +36,13 @@ function run(args: string[]) {
   execFileSync(ffmpeg(), args, { stdio: 'pipe' })
 }
 
+function clipHasAudio(file: string) {
+  const result = spawnSync(ffmpeg(), ['-hide_banner', '-i', file], { encoding: 'utf8' })
+  return /Audio:/.test(result.stderr || '')
+}
+
+const VIDEO_ENCODE = ['-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac']
+
 export function stitchSceneFiles(scenes: StitchScene[]) {
   if (scenes.length < 2) throw new Error('Sila sediakan sekurang-kurangnya 2 adegan.')
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ugc-'))
@@ -46,7 +53,7 @@ export function stitchSceneFiles(scenes: StitchScene[]) {
       const videoPath = path.join(dir, `in-${index}.mp4`)
       const outPath = path.join(dir, `out-${index}.mp4`)
       fs.writeFileSync(videoPath, scene.video)
-      const scale = 'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1'
+      const picture = 'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24'
       if (scene.audio && scene.audio.length > 0) {
         const audioPath = path.join(dir, `audio-${index}`)
         fs.writeFileSync(audioPath, scene.audio)
@@ -54,14 +61,21 @@ export function stitchSceneFiles(scenes: StitchScene[]) {
           '-y',
           '-i', videoPath,
           '-i', audioPath,
-          '-vf', scale,
-          '-r', '24',
-          '-c:v', 'libx264',
-          '-preset', 'veryfast',
-          '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac',
-          '-ar', '44100',
-          '-ac', '2',
+          '-filter_complex', `[0:v]${picture}[v];[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a]`,
+          '-map', '[v]',
+          '-map', '[a]',
+          ...VIDEO_ENCODE,
+          '-shortest',
+          outPath,
+        ])
+      } else if (clipHasAudio(videoPath)) {
+        run([
+          '-y',
+          '-i', videoPath,
+          '-filter_complex', `[0:v]${picture}[v];[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a]`,
+          '-map', '[v]',
+          '-map', '[a]',
+          ...VIDEO_ENCODE,
           '-shortest',
           outPath,
         ])
@@ -71,14 +85,10 @@ export function stitchSceneFiles(scenes: StitchScene[]) {
           '-i', videoPath,
           '-f', 'lavfi',
           '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-          '-vf', scale,
-          '-r', '24',
-          '-c:v', 'libx264',
-          '-preset', 'veryfast',
-          '-pix_fmt', 'yuv420p',
-          '-c:a', 'aac',
-          '-ar', '44100',
-          '-ac', '2',
+          '-filter_complex', `[0:v]${picture}[v]`,
+          '-map', '[v]',
+          '-map', '1:a:0',
+          ...VIDEO_ENCODE,
           '-shortest',
           outPath,
         ])

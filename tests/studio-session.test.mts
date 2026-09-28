@@ -18,7 +18,7 @@ import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replic
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import { parseStoryboard, publicGeminiError, TEXT_MODELS, textThinking } from '../src/lib/gemini-text.ts'
 import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import ffmpegPath from 'ffmpeg-static'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -258,5 +258,22 @@ test('dua klip dicantum menjadi satu video', () => {
   ])
   assert.ok(output.length > 1000)
   assert.equal(output.subarray(4, 8).toString(), 'ftyp')
+
+  const loud = path.join(dir, 'loud.mp4')
+  execFileSync(ffmpegPath as string, [
+    '-y', '-f', 'lavfi', '-i', 'color=c=blue:s=320x568:d=1',
+    '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=44100:duration=1',
+    '-shortest', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-ac', '1', loud,
+  ], { stdio: 'pipe' })
+  const kept = stitchSceneFiles([
+    { video: fs.readFileSync(loud) },
+    { video: makeClip('quiet.mp4', 'black') },
+  ])
+  const heard = spawnSync(ffmpegPath as string, ['-i', 'pipe:0', '-af', 'volumedetect', '-f', 'null', '-'], {
+    input: kept,
+  })
+  const peak = /max_volume:\s*(-?[\d.]+|-inf)\s*dB/.exec(heard.stderr?.toString() || '')
+  assert.ok(peak, heard.stderr)
+  assert.ok(Number(peak?.[1]) > -40, peak?.[0])
   fs.rmSync(dir, { recursive: true, force: true })
 })
