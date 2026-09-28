@@ -6,8 +6,9 @@ import { rememberJob, START_CREDITS } from '@/lib/studio-session'
 import { cleanAspect, directStudioPrompt } from '@/lib/studio-prompt'
 import { audioDataUrl, presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
 import { OMNI_MODEL, omniHumanInput, SADTALKER_VERSION, sadTalkerInput } from '@/lib/avatar-motion'
-import { ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
+import { placePrompt, ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
 import { hostedAssetUrl, publicVideoError } from '@/lib/replicate-media'
+import { restageImage } from '@/lib/restage-image'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -69,6 +70,7 @@ export async function POST(req: Request) {
     let enhancedPrompt = ''
 
     if (type === 'avatar' && imageUrl) {
+      const stagedPromise = restageImage(imageUrl, placePrompt(spokenDirection, 'orang'))
       let finalAudio = customAudio
 
       if (!finalAudio && scriptMalay) {
@@ -79,7 +81,8 @@ export async function POST(req: Request) {
         throw new Error('Sila muat naik fail audio suara atau sediakan skrip!')
       }
 
-      const imageHosted = await asHosted(imageUrl)
+      const staged = await stagedPromise
+      const imageHosted = await asHosted(staged || imageUrl)
       const audioHosted = await asHosted(finalAudio)
 
       const createSadTalker = () =>
@@ -122,7 +125,11 @@ export async function POST(req: Request) {
       if (imageUrl) {
         finalPrompt = `${finalPrompt} Subtle natural movement, continuous shot, preserve the reference image.`
       }
-      const frameImage = typeof imageUrl === 'string' && imageUrl ? await asHosted(imageUrl) : undefined
+      let frame = typeof imageUrl === 'string' ? imageUrl : ''
+      if (type === 'b-roll' && frame) {
+        frame = (await restageImage(frame, placePrompt(spokenDirection, 'produk'))) || frame
+      }
+      const frameImage = frame ? await asHosted(frame) : undefined
 
       prediction = await replicate.predictions.create({
         model: 'minimax/video-01',

@@ -27,6 +27,7 @@ export default function UgcStoryboard() {
   const [productBenefits, setProductBenefits] = useState('')
   const [targetAudience, setTargetAudience] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [buildLabel, setBuildLabel] = useState('')
   const [scriptData, setScriptData] = useState<ScriptData | null>(null)
 
   // State Gambar & Audio Rujukan
@@ -67,33 +68,6 @@ export default function UgcStoryboard() {
     }
   }
 
-  const handleGenerateScript = async () => {
-    if (!productName || !productBenefits) {
-      return alert('Sila masukkan Nama Produk dan Kelebihan Utama!')
-    }
-
-    setIsLoading(true)
-    try {
-      const res = await fetch('/api/script', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productName, productBenefits, targetAudience, direction }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Gagal menjana skrip')
-
-      setScriptData(data.data)
-      setScriptDirection(direction)
-      setSceneStates({})
-      setStitchedVideo('')
-    } catch (err: any) {
-      alert(`Ralat: ${err.message}`)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handlePlayAudio = async (text: string) => {
     try {
       const res = await fetch('/api/tts', {
@@ -114,123 +88,190 @@ export default function UgcStoryboard() {
     }
   }
 
-  const pollSceneStatus = (jobId: string, scene: Scene, sandaran = false) => {
-    const started = Date.now()
-    let misses = 0
-    const interval = setInterval(async () => {
-      if (Date.now() - started > 12 * 60 * 1000) {
-        clearInterval(interval)
-        setSceneStates((prev) => ({
-          ...prev,
-          [scene.sceneNumber]: { isGenerating: false, status: 'Masa tamat', url: '' },
-        }))
-        return
-      }
-      try {
-        const res = await fetch(`/api/status?id=${jobId}`)
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Status tidak dapat disemak')
-        misses = 0
-
-        if (data.status === 'succeeded') {
+  const waitForJob = (jobId: string, scene: Scene, sandaran: boolean, spoken: UgcDirection) =>
+    new Promise<string>((resolve, reject) => {
+      const started = Date.now()
+      let misses = 0
+      const interval = setInterval(async () => {
+        if (Date.now() - started > 12 * 60 * 1000) {
           clearInterval(interval)
-          const url = Array.isArray(data.output) ? data.output[0] : data.output
           setSceneStates((prev) => ({
             ...prev,
-            [scene.sceneNumber]: { isGenerating: false, status: 'Siap', url },
+            [scene.sceneNumber]: { isGenerating: false, status: 'Masa tamat', url: '' },
           }))
-        } else if (data.status === 'failed' || data.status === 'canceled') {
-          clearInterval(interval)
-          if (scene.type === 'avatar' && !sandaran && data.busy) {
+          reject(new Error('Masa tamat'))
+          return
+        }
+        try {
+          const res = await fetch(`/api/status?id=${jobId}`)
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || 'Status tidak dapat disemak')
+          misses = 0
+
+          if (data.status === 'succeeded') {
+            clearInterval(interval)
+            const url = Array.isArray(data.output) ? data.output[0] : data.output
             setSceneStates((prev) => ({
               ...prev,
-              [scene.sceneNumber]: { isGenerating: true, status: 'Cara licin sibuk, mencuba cara lama...', url: '' },
+              [scene.sceneNumber]: { isGenerating: false, status: 'Siap', url },
             }))
-            void handleGenerateSceneVideo(scene, true)
-            return
+            resolve(url)
+          } else if (data.status === 'failed' || data.status === 'canceled') {
+            clearInterval(interval)
+            if (scene.type === 'avatar' && !sandaran && data.busy) {
+              setSceneStates((prev) => ({
+                ...prev,
+                [scene.sceneNumber]: { isGenerating: true, status: 'Cara licin sibuk, mencuba cara lama...', url: '' },
+              }))
+              requestScene(scene, true, spoken).then(resolve, reject)
+              return
+            }
+            const errorMsg = data.error || 'Penjanaan video gagal di pelayan AI.'
+            setSceneStates((prev) => ({
+              ...prev,
+              [scene.sceneNumber]: { isGenerating: false, status: 'Gagal', url: '' },
+            }))
+            reject(new Error(errorMsg))
+          } else {
+            setSceneStates((prev) => ({
+              ...prev,
+              [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: `${data.status}...` },
+            }))
           }
-          const errorMsg = data.error || 'Penjanaan video gagal di pelayan AI.'
-          alert(`Ralat Adegan ${scene.sceneNumber}: ${errorMsg}`)
-          setSceneStates((prev) => ({
-            ...prev,
-            [scene.sceneNumber]: { isGenerating: false, status: 'Gagal', url: '' },
-          }))
-        } else {
-          setSceneStates((prev) => ({
-            ...prev,
-            [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: `${data.status}...` },
-          }))
+        } catch (err) {
+          misses += 1
+          if (misses >= 5) {
+            clearInterval(interval)
+            console.error('Ralat status adegan:', err)
+            setSceneStates((prev) => ({
+              ...prev,
+              [scene.sceneNumber]: { isGenerating: false, status: 'Sambungan terputus', url: '' },
+            }))
+            reject(err instanceof Error ? err : new Error('Sambungan terputus'))
+          }
         }
-      } catch (err) {
-        misses += 1
-        if (misses >= 5) {
-          clearInterval(interval)
-          console.error('Ralat status adegan:', err)
-          setSceneStates((prev) => ({
-            ...prev,
-            [scene.sceneNumber]: { isGenerating: false, status: 'Sambungan terputus', url: '' },
-          }))
-        }
-      }
-    }, 4000)
-  }
+      }, 4000)
+    })
 
-  const handleGenerateSceneVideo = async (scene: Scene, sandaran = false) => {
+  const requestScene = async (scene: Scene, sandaran = false, spoken: UgcDirection = scriptDirection) => {
     const selectedImage = scene.type === 'avatar' ? avatarImage : productImage
-
     if (scene.type === 'avatar' && !selectedImage) {
-      return alert(`Sila muat naik Gambar Avatar untuk menjana adegan ${scene.sceneNumber}!`)
+      throw new Error(`Sila muat naik gambar orang untuk adegan ${scene.sceneNumber}.`)
+    }
+    if (scene.type === 'b-roll' && !selectedImage) {
+      throw new Error('Sila muat naik gambar produk.')
     }
 
     setSceneStates((prev) => ({
       ...prev,
-      [scene.sceneNumber]: { isGenerating: true, status: '🧠 Menghantar ke AI...', url: '' },
+      [scene.sceneNumber]: { isGenerating: true, status: 'Menyusun scene...', url: '' },
     }))
 
-    try {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: scene.visualPrompt,
-          aspectRatio: '9:16',
-          imageUrl: selectedImage,
-          type: scene.type,
-          scriptMalay: scene.scriptMalay,
-          customAudio: customAudios[scene.sceneNumber] || null,
-          voice: presenterVoice,
-          direction: scriptDirection,
-          motion: sandaran ? 'sandaran' : undefined,
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Gagal memproses adegan')
-
-      setSceneStates((prev) => ({
-        ...prev,
-        [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: '🎬 Diproses...' },
-      }))
-
-      pollSceneStatus(data.jobId, scene, sandaran)
-    } catch (err: any) {
-      alert(`Ralat adegan ${scene.sceneNumber}: ${err.message}`)
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: scene.visualPrompt,
+        aspectRatio: '9:16',
+        imageUrl: selectedImage,
+        type: scene.type,
+        scriptMalay: scene.scriptMalay,
+        customAudio: customAudios[scene.sceneNumber] || null,
+        voice: presenterVoice,
+        direction: spoken,
+        motion: sandaran ? 'sandaran' : undefined,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
       setSceneStates((prev) => ({
         ...prev,
         [scene.sceneNumber]: { isGenerating: false, status: '❌ Ralat', url: '' },
       }))
+      throw new Error(data.error || 'Gagal memproses adegan')
+    }
+    setSceneStates((prev) => ({
+      ...prev,
+      [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: '🎬 Diproses...' },
+    }))
+    return waitForJob(data.jobId, scene, sandaran, spoken)
+  }
+
+  const handleGenerateSceneVideo = async (scene: Scene) => {
+    try {
+      await requestScene(scene)
+    } catch (err: any) {
+      alert(`Ralat adegan ${scene.sceneNumber}: ${err.message}`)
     }
   }
 
-  const handleGenerateAllScenes = async () => {
-    if (!scriptData) return
-
-    for (const scene of scriptData.scenes) {
-      const currentState = sceneStates[scene.sceneNumber]
-      if (!currentState?.url && !currentState?.isGenerating) {
-        await handleGenerateSceneVideo(scene)
-        await new Promise((resolve) => setTimeout(resolve, 3500))
+  const stitchClips = async (clips: { url: string; scriptMalay: string; type: string }[]) => {
+    if (clips.length < 2) return
+    setIsStitching(true)
+    try {
+      const res = await fetch('/api/stitch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenes: clips, voice: presenterVoice }),
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Gagal mencantumkan video')
       }
+      const videoBlob = await res.blob()
+      setStitchedVideo(URL.createObjectURL(videoBlob))
+    } catch (err: any) {
+      alert(`Ralat cantum video: ${err.message}`)
+    } finally {
+      setIsStitching(false)
+    }
+  }
+
+  const handleBuildAd = async () => {
+    if (!productName || !productBenefits) {
+      return alert('Sila masukkan Nama Produk dan Kelebihan Utama!')
+    }
+    if (!avatarImage || !productImage) {
+      return alert('Sila muat naik gambar orang dan gambar produk.')
+    }
+
+    setIsLoading(true)
+    setBuildLabel('Menulis skrip...')
+    setSceneStates({})
+    setStitchedVideo('')
+    try {
+      const res = await fetch('/api/script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productName, productBenefits, targetAudience, direction }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Gagal menjana skrip')
+      const board = data.data as ScriptData
+      setScriptData(board)
+      setScriptDirection(direction)
+
+      const ready: { url: string; scriptMalay: string; type: string }[] = []
+      for (let index = 0; index < board.scenes.length; index += 1) {
+        const scene = board.scenes[index]
+        setBuildLabel(`Adegan ${index + 1} daripada ${board.scenes.length}`)
+        try {
+          const url = await requestScene(scene, false, direction)
+          ready.push({ url, scriptMalay: scene.scriptMalay, type: scene.type })
+        } catch (err: any) {
+          alert(`Ralat adegan ${scene.sceneNumber}: ${err.message}`)
+        }
+      }
+
+      if (ready.length >= 2) {
+        setBuildLabel('Mencantumkan iklan...')
+        await stitchClips(ready)
+      }
+    } catch (err: any) {
+      alert(`Ralat: ${err.message}`)
+    } finally {
+      setBuildLabel('')
+      setIsLoading(false)
     }
   }
 
@@ -282,7 +323,7 @@ export default function UgcStoryboard() {
           UGC Script & Storyboard
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Muat naik gambar rujukan orang, produk, atau rakam suara sendiri untuk hasil video AI yang realistik.
+          Muat naik gambar orang dan gambar produk. Arah yang dipilih mencipta scene untuk kedua-duanya. Satu iklan siap dalam beberapa minit.
         </p>
       </div>
 
@@ -290,7 +331,7 @@ export default function UgcStoryboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950 p-4 border border-slate-800 rounded-xl">
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-purple-400 flex justify-between">
-            <span>Gambar Avatar / Model (Opsional)</span>
+            <span>Gambar Orang</span>
             {avatarImage && (
               <button onClick={() => setAvatarImage(null)} className="text-[10px] text-red-400 hover:underline">Padam</button>
             )}
@@ -313,7 +354,7 @@ export default function UgcStoryboard() {
 
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-purple-400 flex justify-between">
-            <span>Gambar Produk (Opsional)</span>
+            <span>Gambar Produk</span>
             {productImage && (
               <button onClick={() => setProductImage(null)} className="text-[10px] text-red-400 hover:underline">Padam</button>
             )}
@@ -413,11 +454,11 @@ export default function UgcStoryboard() {
       </div>
 
       <button
-        onClick={handleGenerateScript}
+        onClick={handleBuildAd}
         disabled={isLoading}
         className="bs-btn w-full py-3 text-xs disabled:opacity-50"
       >
-        {isLoading ? '🧠 Gemini sedang menulis skrip UGC...' : '📝 Jana Skrip & Papan Cerita 4-Adegan'}
+        {buildLabel || 'Buat iklan'}
       </button>
 
       {scriptData && (
@@ -426,24 +467,17 @@ export default function UgcStoryboard() {
             <div>
               <h3 className="text-sm font-bold text-amber-400">📋 {scriptData.title}</h3>
               <p className="text-[11px] text-slate-400">
-                {completedCount}/4 adegan sedia. Setiap klip dijana berasingan. Angka kredit di atas untuk tab Studio.
+                {buildLabel || `${completedCount}/4 adegan sedia.`} Angka kredit di atas untuk tab Studio.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handleGenerateAllScenes}
-                className="bs-btn py-2 px-3 text-xs"
-              >
-                🚀 Jana Kesemua 4 Klip
-              </button>
-
               {completedCount >= 2 && (
                 <button
                   onClick={handleStitchVideos}
-                  disabled={isStitching}
+                  disabled={isStitching || isLoading}
                   className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-lg disabled:opacity-50"
                 >
-                  {isStitching ? '🔄 Mencantumkan Audio & Video...' : '🎞️ Cantumkan Klip Menjadi 1 Video'}
+                  {isStitching ? 'Mencantumkan...' : 'Cantumkan semula'}
                 </button>
               )}
             </div>

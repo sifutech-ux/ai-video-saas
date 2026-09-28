@@ -2,22 +2,22 @@ export const UGC_DIRECTIONS = [
   {
     id: 'santai',
     label: 'UGC Santai',
-    hint: 'Gaya iklan santai. Penyampai bercakap biasa, produk dekat.',
+    hint: 'Penyampai dan produk dalam suasana santai.',
   },
   {
     id: 'live',
     label: 'Live Selling',
-    hint: 'Hos di meja, ayat terus, seruan beli. Orang kekal dalam gambar yang dimuat naik.',
+    hint: 'Penyampai dan produk di meja jualan yang terang.',
   },
   {
     id: 'kecantikan',
     label: 'Demo Kecantikan',
-    hint: 'Dekat dan tenang. Klip produk tunjuk tekstur di meja solek.',
+    hint: 'Penyampai dan produk di meja solek.',
   },
   {
     id: 'pelancaran',
     label: 'Pelancaran Produk',
-    hint: 'Nada senyap. Produk di atas pelamin, cahaya lembut.',
+    hint: 'Penyampai dan produk di atas pelamin, cahaya lembut.',
   },
 ] as const
 
@@ -36,28 +36,28 @@ const LOOK: Record<UgcDirection, { avatar: string; broll: string; marker: string
   santai: {
     marker: 'casual UGC tabletop',
     avatar:
-      'Casual Malaysian UGC, the same person in the original photo, same clothes and background, talking naturally to camera. No on-screen text.',
+      'Same face, casual UGC tabletop in a simple bright room, waist-up, talking to camera. No on-screen text.',
     broll:
       'Casual UGC tabletop, close product shot in natural light, keep the product pack from the reference image. No on-screen text.',
   },
   live: {
     marker: 'bright live-selling table',
     avatar:
-      'Live-selling host energy, the same person stays in the original photo, same clothes and background, talking directly to camera. No on-screen text, no comment overlay.',
+      'Same face at a bright live-selling table with a ring light, waist-up, talking to camera. No on-screen text, no comment overlay.',
     broll:
       'Bright live-selling table, ring light, product close on a table, vertical, keep the product pack from the reference image. No on-screen text, no comment overlay.',
   },
   kecantikan: {
     marker: 'soft vanity close-up',
     avatar:
-      'Calm beauty demo, the same person stays in the original photo, same clothes and background, gentle close talk to camera. No on-screen text, no skin diagram.',
+      'Same face, soft vanity close-up, gentle talk to camera. No on-screen text, no skin diagram.',
     broll:
       'Soft vanity close-up, product texture, drop, or smear on a dressing table, keep the product pack from the reference image. No on-screen text, no skin diagram.',
   },
   pelancaran: {
     marker: 'premium product pedestal',
     avatar:
-      'Quiet premium launch, the same person stays in the original photo, same clothes and background, slow calm talk to camera. No on-screen text.',
+      'Same face in a quiet premium product pedestal set, soft light, slow talk to camera. No on-screen text.',
     broll:
       'Premium product pedestal, soft light, pack and logo clear, slow move, keep the product pack from the reference image. No on-screen text.',
   },
@@ -88,6 +88,36 @@ Adegan 3 b-roll: butiran pek, logo jelas.
 Adegan 4 avatar: ajak tengok produk baharu.`,
 }
 
+export function placePrompt(direction: UgcDirection, kind: 'orang' | 'produk') {
+  const place = {
+    santai: {
+      orang:
+        'Place this same person in a simple bright room, casual UGC tabletop behind them, waist-up, looking at the camera. Keep the face identical. Vertical 9:16. No text.',
+      produk:
+        'Place this exact product pack on a simple table in soft daylight, casual UGC tabletop. Keep the pack and logo identical. Vertical 9:16. No text.',
+    },
+    live: {
+      orang:
+        'Place this same person at a bright live-selling table with a ring light, waist-up, looking at the camera. Keep the face identical. Vertical 9:16. No text, no comments, no prices.',
+      produk:
+        'Place this exact product pack on a bright live-selling table under a ring light, close. Keep the pack and logo identical. Vertical 9:16. No text, no comments.',
+    },
+    kecantikan: {
+      orang:
+        'Place this same person at a soft vanity close-up, gentle, looking at the camera. Keep the face identical. Vertical 9:16. No text, no skin diagram.',
+      produk:
+        'Place this exact product pack on a soft vanity close-up, texture visible. Keep the pack and logo identical. Vertical 9:16. No text, no skin diagram.',
+    },
+    pelancaran: {
+      orang:
+        'Place this same person beside a premium product pedestal, soft light, waist-up, looking at the camera. Keep the face identical. Vertical 9:16. No text.',
+      produk:
+        'Place this exact product pack on a premium product pedestal, soft light, pack and logo clear. Keep the pack identical. Vertical 9:16. No text.',
+    },
+  } satisfies Record<UgcDirection, { orang: string; produk: string }>
+  return place[direction][kind]
+}
+
 export function withDirectionLook(prompt: string, direction: UgcDirection, type: 'avatar' | 'b-roll') {
   const look = LOOK[direction]
   const sentence = type === 'b-roll' ? look.broll : look.avatar
@@ -114,8 +144,9 @@ ${BEATS[input.direction]}
 Bahasa skrip: Melayu, ayat pendek, seperti bercakap pada kamera.
 Tepat 4 adegan, jenis mengikut susunan: avatar, b-roll, b-roll, avatar.
 visualPrompt dalam bahasa Inggeris, satu ayat.
-Orang dalam adegan avatar kekal dalam gambar asal. Jangan pindahkan mereka ke bilik atau pentas baharu.
-Klip produk sahaja yang tunjuk suasana arah ini.
+Orang dan produk kedua-duanya berada dalam suasana arah ini. Kekalkan muka orang dan rupa pek produk.
+Klip orang: penyampai di dalam scene arah ini.
+Klip produk: pek produk di dalam scene arah yang sama.
 
 Bentuk JSON:
 {"title":"tajuk","scenes":[{"sceneNumber":1,"type":"avatar","title":"Hook (0-3s)","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":2,"type":"b-roll","title":"Masalah (3-6s)","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":3,"type":"b-roll","title":"Penyelesaian (6-9s)","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":4,"type":"avatar","title":"Call To Action (9-12s)","scriptMalay":"...","visualPrompt":"..."}]}`
