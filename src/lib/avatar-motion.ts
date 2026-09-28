@@ -13,7 +13,7 @@ export function omniHumanInput(image: string, audio: string, direction: keyof ty
   return {
     image,
     audio,
-    prompt: `A steady medium front shot. The same person stays in the original photo, same face, clothes, and background. They look at the camera, ${energy}. Smooth head and shoulder movement, continuous lip movement, one continuous shot, no jump cuts, no new room.`,
+    prompt: `The person in this photo speaks to the camera. Keep this exact face, clothes, and background. They look at the camera, ${energy}. Smooth head and shoulder movement, continuous lip movement, one continuous shot, no jump cuts.`,
     fast_mode: false,
   }
 }

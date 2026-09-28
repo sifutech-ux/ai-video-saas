@@ -11,7 +11,7 @@ import {
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection } from '../src/lib/malay-voice.ts'
-import { dressStoryboard, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
+import { dressStoryboard, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
 import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import { parseStoryboard, publicGeminiError } from '../src/lib/gemini-text.ts'
@@ -150,7 +150,10 @@ test('arah iklan menukar skrip dan klip produk', () => {
   )
   assert.match(dressed.scenes[0].visualPrompt, /bright live-selling table/i)
   assert.equal(withDirectionLook(dressed.scenes[0].visualPrompt, 'live', 'b-roll'), dressed.scenes[0].visualPrompt)
-  assert.match(dressed.scenes[1].visualPrompt, /original photo/)
+  assert.match(dressed.scenes[1].visualPrompt, /same face/i)
+  assert.match(placePrompt('live', 'orang'), /face identical/)
+  assert.match(placePrompt('live', 'produk'), /bright live-selling table/)
+  assert.match(placePrompt('pelancaran', 'produk'), /pedestal/)
 })
 
 test('ralat muat naik video dipendekkan', () => {
