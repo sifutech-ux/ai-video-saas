@@ -16,7 +16,7 @@ import { sceneOutputUrl, SCENE_MISS, restageImage } from '../src/lib/restage-ima
 import { publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
 import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
-import { parseStoryboard, publicGeminiError } from '../src/lib/gemini-text.ts'
+import { parseStoryboard, publicGeminiError, TEXT_MODELS, textThinking } from '../src/lib/gemini-text.ts'
 import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
 import { execFileSync } from 'node:child_process'
 import ffmpegPath from 'ffmpeg-static'
@@ -88,7 +88,11 @@ test('papan cerita menerima JSON yang dibalut ayat', () => {
   const previous = process.env.GEMINI_API_KEY
   process.env.GEMINI_API_KEY = 'ujian'
   try {
-    assert.match(publicGeminiError('models/gemini-2.5-flash is not found'), /Model Gemini lama/)
+    assert.match(publicGeminiError('models/gemini-2.5-flash is not found'), /Penulis skrip Gemini tidak tersedia/)
+    assert.equal(TEXT_MODELS.includes('gemini-2.5-flash' as never), false)
+    assert.equal(TEXT_MODELS[0], 'gemini-3.5-flash-lite')
+    assert.deepEqual(textThinking('gemini-3.5-flash'), { thinkingLevel: 'MINIMAL' })
+    assert.deepEqual(textThinking('gemini-2.5-flash'), { thinkingBudget: 0 })
   } finally {
     if (previous === undefined) delete process.env.GEMINI_API_KEY
     else process.env.GEMINI_API_KEY = previous
