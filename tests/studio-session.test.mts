@@ -11,6 +11,7 @@ import {
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection } from '../src/lib/malay-voice.ts'
+import { dressStoryboard, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import { parseStoryboard, publicGeminiError } from '../src/lib/gemini-text.ts'
 import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
@@ -113,6 +114,42 @@ test('suara lalai lelaki dan gerakan avatar licin', () => {
   assert.match(motion.prompt, /talks naturally/)
   assert.equal(motion.image.startsWith('data:image'), true)
   assert.equal(sadTalkerInput('img', 'aud').still, false)
+})
+
+test('arah iklan menukar skrip dan klip produk', () => {
+  assert.equal(ugcDirection(undefined), 'santai')
+  assert.equal(ugcDirection('live'), 'live')
+  assert.equal(ugcDirection('lain'), 'santai')
+  const live = scriptPrompt({
+    productName: 'Lemon',
+    productBenefits: 'lancar',
+    targetAudience: 'ibu',
+    direction: 'live',
+  })
+  assert.match(live, /Live Selling/)
+  assert.match(live, /beli sekarang/)
+  const beauty = scriptPrompt({
+    productName: 'Krim',
+    productBenefits: 'lembut',
+    targetAudience: '',
+    direction: 'kecantikan',
+  })
+  assert.match(beauty, /meja solek/)
+  assert.match(beauty, /rajah kulit/)
+  const launch = scriptPrompt({
+    productName: 'Telefon',
+    productBenefits: 'tahan',
+    targetAudience: 'umum',
+    direction: 'pelancaran',
+  })
+  assert.match(launch, /pelamin/)
+  const dressed = dressStoryboard(
+    { title: 'Lemon', scenes: [{ type: 'b-roll', visualPrompt: 'A lemon drink.' }, { type: 'avatar', visualPrompt: 'A man talks.' }] },
+    'live'
+  )
+  assert.match(dressed.scenes[0].visualPrompt, /bright live-selling table/i)
+  assert.equal(withDirectionLook(dressed.scenes[0].visualPrompt, 'live', 'b-roll'), dressed.scenes[0].visualPrompt)
+  assert.match(dressed.scenes[1].visualPrompt, /original photo/)
 })
 
 test('dua klip dicantum menjadi satu video', () => {

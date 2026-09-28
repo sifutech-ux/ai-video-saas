@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { directionLabel, UGC_DIRECTIONS, type UgcDirection } from '@/lib/ugc-direction'
 
 interface Scene {
   sceneNumber: number
@@ -40,6 +41,8 @@ export default function UgcStoryboard() {
   const [stitchedVideo, setStitchedVideo] = useState('')
   const [isStitching, setIsStitching] = useState(false)
   const [presenterVoice, setPresenterVoice] = useState<'lelaki' | 'perempuan'>('lelaki')
+  const [direction, setDirection] = useState<UgcDirection>('santai')
+  const [scriptDirection, setScriptDirection] = useState<UgcDirection>('santai')
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'product') => {
     const file = e.target.files?.[0]
@@ -74,13 +77,16 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/script', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productName, productBenefits, targetAudience }),
+        body: JSON.stringify({ productName, productBenefits, targetAudience, direction }),
       })
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Gagal menjana skrip')
 
       setScriptData(data.data)
+      setScriptDirection(direction)
+      setSceneStates({})
+      setStitchedVideo('')
     } catch (err: any) {
       alert(`Ralat: ${err.message}`)
     } finally {
@@ -185,6 +191,7 @@ export default function UgcStoryboard() {
           scriptMalay: scene.scriptMalay,
           customAudio: customAudios[scene.sceneNumber] || null,
           voice: presenterVoice,
+          direction: scriptDirection,
         }),
       })
 
@@ -353,6 +360,28 @@ export default function UgcStoryboard() {
             className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
           />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-xs text-slate-300">Arah iklan</span>
+        <div className="flex flex-wrap gap-2">
+          {UGC_DIRECTIONS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setDirection(item.id)}
+              className={`text-xs px-3 py-1 rounded-full border ${direction === item.id ? 'bs-on' : 'border-white/10 text-slate-400'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-500">
+          {UGC_DIRECTIONS.find((item) => item.id === direction)?.hint}
+          {scriptData && direction !== scriptDirection
+            ? ` Skrip semasa ialah ${directionLabel(scriptDirection)}. Jana skrip semula untuk arah ini.`
+            : ''}
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

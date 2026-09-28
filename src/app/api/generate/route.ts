@@ -6,6 +6,7 @@ import { rememberJob, START_CREDITS } from '@/lib/studio-session'
 import { cleanAspect, directStudioPrompt } from '@/lib/studio-prompt'
 import { audioDataUrl, presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
 import { OMNI_MODEL, omniHumanInput, SADTALKER_VERSION, sadTalkerInput } from '@/lib/avatar-motion'
+import { ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { prompt, aspectRatio, imageUrl, type, scriptMalay, customAudio, style, voice } = body
     const spokenVoice = presenterVoice(voice)
+    const spokenDirection = ugcDirection(body.direction)
 
     if (!imageUrl && type === 'avatar') {
       return NextResponse.json({ error: 'Sila muat naik Gambar Avatar!' }, { status: 400 })
@@ -72,7 +74,7 @@ export async function POST(req: Request) {
         try {
           return await replicate.predictions.create({
             model: OMNI_MODEL,
-            input: omniHumanInput(imageUrl, finalAudio),
+            input: omniHumanInput(imageUrl, finalAudio, spokenDirection),
           })
         } catch (err: any) {
           if ((err?.status === 429 || err?.message?.includes('429')) && retryCount < 2) {
@@ -98,6 +100,9 @@ export async function POST(req: Request) {
         })
       }
       let finalPrompt = enhancedPrompt || (typeof prompt === 'string' ? prompt : '')
+      if (type === 'b-roll') {
+        finalPrompt = withDirectionLook(finalPrompt, spokenDirection, 'b-roll')
+      }
       if (imageUrl) {
         finalPrompt = `${finalPrompt} Subtle natural movement, continuous shot, preserve the reference image.`
       }
