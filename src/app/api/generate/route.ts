@@ -80,10 +80,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Gambar terlalu besar. Sila guna gambar yang lebih kecil.' }, { status: 413 })
       }
       const spokenLine = typeof scriptMalay === 'string' ? fitSpokenLine(scriptMalay, PRESENTER_WORDS) : ''
-      const audioPromise = (!customAudio && spokenLine
+      const audioPromise: Promise<string | Error> = (!customAudio && spokenLine
         ? synthesizeMalay(spokenLine, spokenVoice).then((audio) => audioDataUrl(audio))
         : Promise.resolve(typeof customAudio === 'string' ? customAudio : '')
-      ).catch((error: unknown) => error)
+      ).catch((error: unknown) => (error instanceof Error ? error : new Error('Suara tidak dapat dijana.')))
       let stagedPromise: Promise<string>
       if (avatarFromNote) {
         stagedPromise = createAvatarStill(replicate, avatarStillPrompt(spokenDirection, body.gambaran))
