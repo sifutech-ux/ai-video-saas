@@ -69,7 +69,7 @@ Format Output (WAJIB dalam format JSON SAHAJA, tanpa sebarang teks tambahan):
 
     for (const modelName of candidateModels) {
       try {
-        const model = genAI.getGenerativeAIModel({ model: modelName })
+        const model = genAI.getGenerativeModel({ model: modelName })
         const result = await model.generateContent(prompt)
         responseText = result.response.text()
         if (responseText) break
