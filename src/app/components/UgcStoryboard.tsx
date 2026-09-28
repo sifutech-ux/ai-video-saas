@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { adultAvatarNote } from '@/lib/avatar-still'
 import { directionLabel, UGC_DIRECTIONS, type UgcDirection } from '@/lib/ugc-direction'
 
 interface Scene {
@@ -27,6 +28,8 @@ export default function UgcStoryboard() {
   // State Gambar & Audio Rujukan
   const [avatarImage, setAvatarImage] = useState<string | null>(null)
   const [productImage, setProductImage] = useState<string | null>(null)
+  const [presenterSource, setPresenterSource] = useState<'muka' | 'avatar'>('muka')
+  const [avatarNote, setAvatarNote] = useState('')
 
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
@@ -109,8 +112,10 @@ export default function UgcStoryboard() {
     })
 
   const requestScene = async (scene: Scene, sandaran = false, spoken: UgcDirection = scriptDirection) => {
+    const avatarFromNote = scene.type === 'avatar' && presenterSource === 'avatar'
     const selectedImage = scene.type === 'avatar' ? avatarImage : productImage
-    if (scene.type === 'avatar' && !selectedImage) {
+    if (scene.type === 'avatar' && avatarFromNote) adultAvatarNote(avatarNote)
+    if (scene.type === 'avatar' && !avatarFromNote && !selectedImage) {
       throw new Error(`Sila muat naik gambar orang untuk adegan ${scene.sceneNumber}.`)
     }
     if (scene.type === 'b-roll' && !selectedImage) {
@@ -123,7 +128,9 @@ export default function UgcStoryboard() {
       body: JSON.stringify({
         prompt: scene.visualPrompt,
         aspectRatio: '9:16',
-        imageUrl: selectedImage,
+        imageUrl: avatarFromNote ? undefined : selectedImage,
+        presenter: scene.type === 'avatar' ? presenterSource : undefined,
+        gambaran: avatarFromNote ? avatarNote.trim() : undefined,
         type: scene.type,
         scriptMalay: scene.scriptMalay,
         voice: presenterVoice,
@@ -158,8 +165,14 @@ export default function UgcStoryboard() {
     if (!productName || !productBenefits) {
       return alert('Sila masukkan Nama Produk dan Kelebihan Utama!')
     }
-    if (!avatarImage || !productImage) {
-      return alert('Sila muat naik gambar orang dan gambar produk.')
+    if (!productImage) return alert('Sila muat naik gambar produk.')
+    if (presenterSource === 'muka' && !avatarImage) return alert('Sila muat naik gambar orang.')
+    if (presenterSource === 'avatar') {
+      try {
+        adultAvatarNote(avatarNote)
+      } catch (err: any) {
+        return alert(err.message)
+      }
     }
 
     setIsLoading(true)
@@ -204,7 +217,7 @@ export default function UgcStoryboard() {
           UGC Script & Storyboard
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Muat naik gambar orang dan gambar produk. Arah yang dipilih mencipta scene untuk kedua-duanya. Satu iklan siap dalam beberapa minit.
+          Pilih muka dari gambar, atau tulis gambaran avatar. Gambar produk tetap wajib. Satu iklan siap dalam beberapa minit.
         </p>
       </div>
 
@@ -213,23 +226,55 @@ export default function UgcStoryboard() {
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-purple-400 flex justify-between">
             <span>Gambar Orang</span>
-            {avatarImage && (
+            {presenterSource === 'muka' && avatarImage && (
               <button onClick={() => setAvatarImage(null)} className="text-[10px] text-red-400 hover:underline">Padam</button>
             )}
           </label>
-          <input type="file" accept="image/*" ref={avatarInputRef} onChange={(e) => handleImageUpload(e, 'avatar')} className="hidden" />
-          {!avatarImage ? (
-            <div
-              onClick={() => avatarInputRef.current?.click()}
-              className="border border-dashed border-slate-800 hover:border-purple-500 p-3 rounded-xl cursor-pointer text-center bg-slate-900 transition"
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setPresenterSource('muka')}
+              className={`text-xs px-3 py-1 rounded-full border ${presenterSource === 'muka' ? 'bs-on' : 'border-white/10 text-slate-400'}`}
             >
-              <span className="text-base block mb-1">👤</span>
-              <p className="text-xs text-slate-400">Muat naik gambar rujukan muka/orang</p>
-            </div>
+              Muka gambar
+            </button>
+            <button
+              type="button"
+              onClick={() => setPresenterSource('avatar')}
+              className={`text-xs px-3 py-1 rounded-full border ${presenterSource === 'avatar' ? 'bs-on' : 'border-white/10 text-slate-400'}`}
+            >
+              Avatar AI
+            </button>
+          </div>
+          {presenterSource === 'muka' ? (
+            <>
+              <input type="file" accept="image/*" ref={avatarInputRef} onChange={(e) => handleImageUpload(e, 'avatar')} className="hidden" />
+              {!avatarImage ? (
+                <div
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="border border-dashed border-slate-800 hover:border-purple-500 p-3 rounded-xl cursor-pointer text-center bg-slate-900 transition"
+                >
+                  <span className="text-base block mb-1">👤</span>
+                  <p className="text-xs text-slate-400">Muat naik gambar rujukan muka/orang</p>
+                </div>
+              ) : (
+                <div className="w-full h-48 bg-black/60 rounded-lg p-1 border border-purple-500 flex items-center justify-center">
+                  <img src={avatarImage} alt="Avatar" className="max-h-full max-w-full object-contain rounded" />
+                </div>
+              )}
+            </>
           ) : (
-            <div className="w-full h-48 bg-black/60 rounded-lg p-1 border border-purple-500 flex items-center justify-center">
-              <img src={avatarImage} alt="Avatar" className="max-h-full max-w-full object-contain rounded" />
-            </div>
+            <>
+              <textarea
+                value={avatarNote}
+                onChange={(e) => setAvatarNote(e.target.value)}
+                rows={4}
+                maxLength={240}
+                placeholder="Contoh: lelaki dewasa 28 tahun, kemeja navy, rambut pendek"
+                className="w-full min-h-24 bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
+              />
+              <p className="text-[11px] text-slate-500">Orang dewasa sahaja. Jantina, umur, dan baju. AI cipta orang itu dalam scene arah yang dipilih.</p>
+            </>
           )}
         </div>
 

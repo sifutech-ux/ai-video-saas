@@ -8,7 +8,8 @@ import { audioDataUrl, presenterVoice, synthesizeMalay } from '@/lib/malay-voice
 import { OMNI_MODEL, omniHumanInput, SADTALKER_VERSION, sadTalkerInput } from '@/lib/avatar-motion'
 import { placePrompt, ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
 import { hostedAssetUrl, publicVideoError } from '@/lib/replicate-media'
-import { restageImage } from '@/lib/restage-image'
+import { createAvatarStill, restageImage } from '@/lib/restage-image'
+import { adultAvatarNote, avatarStillPrompt, presenterMode } from '@/lib/avatar-still'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -46,7 +47,10 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!imageUrl && type === 'avatar') {
+    const avatarFromNote = type === 'avatar' && presenterMode(body.presenter) === 'avatar'
+    if (avatarFromNote) adultAvatarNote(body.gambaran)
+
+    if (!imageUrl && type === 'avatar' && !avatarFromNote) {
       return NextResponse.json({ error: 'Sila muat naik Gambar Avatar!' }, { status: 400 })
     }
 
@@ -69,9 +73,14 @@ export async function POST(req: Request) {
     let prediction
     let enhancedPrompt = ''
 
-    if (type === 'avatar' && imageUrl) {
-      const sourceImage = await hostedAssetUrl(replicate, imageUrl)
-      const stagedPromise = restageImage(replicate, sourceImage, placePrompt(spokenDirection, 'orang'))
+    if (type === 'avatar') {
+      let stagedPromise: Promise<string>
+      if (avatarFromNote) {
+        stagedPromise = createAvatarStill(replicate, avatarStillPrompt(spokenDirection, body.gambaran))
+      } else {
+        const sourceImage = await hostedAssetUrl(replicate, imageUrl)
+        stagedPromise = restageImage(replicate, sourceImage, placePrompt(spokenDirection, 'orang'))
+      }
       let finalAudio = customAudio
 
       if (!finalAudio && scriptMalay) {
