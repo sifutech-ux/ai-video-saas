@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { denied, requireStudio } from '@/lib/studio-guard'
 import { execSync } from 'child_process'
 import ffmpegPath from 'ffmpeg-static'
 import fs from 'fs'
@@ -6,6 +7,9 @@ import path from 'path'
 import os from 'os'
 
 export async function POST(req: Request) {
+  const session = await requireStudio()
+  if (denied(session)) return session
+
   try {
     const { scenes, gender = 'male' } = await req.json()
 

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
+import { denied, requireStudio } from '@/lib/studio-guard'
 
 export async function POST(req: Request) {
+  const session = await requireStudio()
+  if (denied(session)) return session
+
   try {
     const { text } = await req.json()
 
