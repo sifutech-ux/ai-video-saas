@@ -114,7 +114,7 @@ export default function UgcStoryboard() {
     }
   }
 
-  const pollSceneStatus = (jobId: string, sceneNumber: number) => {
+  const pollSceneStatus = (jobId: string, scene: Scene, sandaran = false) => {
     const started = Date.now()
     let misses = 0
     const interval = setInterval(async () => {
@@ -122,7 +122,7 @@ export default function UgcStoryboard() {
         clearInterval(interval)
         setSceneStates((prev) => ({
           ...prev,
-          [sceneNumber]: { isGenerating: false, status: 'Masa tamat', url: '' },
+          [scene.sceneNumber]: { isGenerating: false, status: 'Masa tamat', url: '' },
         }))
         return
       }
@@ -137,20 +137,28 @@ export default function UgcStoryboard() {
           const url = Array.isArray(data.output) ? data.output[0] : data.output
           setSceneStates((prev) => ({
             ...prev,
-            [sceneNumber]: { isGenerating: false, status: 'Siap', url },
+            [scene.sceneNumber]: { isGenerating: false, status: 'Siap', url },
           }))
         } else if (data.status === 'failed' || data.status === 'canceled') {
           clearInterval(interval)
+          if (scene.type === 'avatar' && !sandaran && data.busy) {
+            setSceneStates((prev) => ({
+              ...prev,
+              [scene.sceneNumber]: { isGenerating: true, status: 'Cara licin sibuk, mencuba cara lama...', url: '' },
+            }))
+            void handleGenerateSceneVideo(scene, true)
+            return
+          }
           const errorMsg = data.error || 'Penjanaan video gagal di pelayan AI.'
-          alert(`Ralat Adegan ${sceneNumber}: ${errorMsg}`)
+          alert(`Ralat Adegan ${scene.sceneNumber}: ${errorMsg}`)
           setSceneStates((prev) => ({
             ...prev,
-            [sceneNumber]: { isGenerating: false, status: 'Gagal', url: '' },
+            [scene.sceneNumber]: { isGenerating: false, status: 'Gagal', url: '' },
           }))
         } else {
           setSceneStates((prev) => ({
             ...prev,
-            [sceneNumber]: { ...prev[sceneNumber], status: `${data.status}...` },
+            [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: `${data.status}...` },
           }))
         }
       } catch (err) {
@@ -160,14 +168,14 @@ export default function UgcStoryboard() {
           console.error('Ralat status adegan:', err)
           setSceneStates((prev) => ({
             ...prev,
-            [sceneNumber]: { isGenerating: false, status: 'Sambungan terputus', url: '' },
+            [scene.sceneNumber]: { isGenerating: false, status: 'Sambungan terputus', url: '' },
           }))
         }
       }
     }, 4000)
   }
 
-  const handleGenerateSceneVideo = async (scene: Scene) => {
+  const handleGenerateSceneVideo = async (scene: Scene, sandaran = false) => {
     const selectedImage = scene.type === 'avatar' ? avatarImage : productImage
 
     if (scene.type === 'avatar' && !selectedImage) {
@@ -192,6 +200,7 @@ export default function UgcStoryboard() {
           customAudio: customAudios[scene.sceneNumber] || null,
           voice: presenterVoice,
           direction: scriptDirection,
+          motion: sandaran ? 'sandaran' : undefined,
         }),
       })
 
@@ -203,7 +212,7 @@ export default function UgcStoryboard() {
         [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: '🎬 Diproses...' },
       }))
 
-      pollSceneStatus(data.jobId, scene.sceneNumber)
+      pollSceneStatus(data.jobId, scene, sandaran)
     } catch (err: any) {
       alert(`Ralat adegan ${scene.sceneNumber}: ${err.message}`)
       setSceneStates((prev) => ({

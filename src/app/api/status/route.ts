@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Replicate from 'replicate'
+import { providerBusy, publicVideoError } from '@/lib/replicate-media'
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN! })
 
@@ -16,7 +17,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       status: prediction.status,
       output: prediction.output,
-      error: prediction.error,
+      error: prediction.error ? publicVideoError(prediction.error) : null,
+      busy: providerBusy(prediction.error),
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
