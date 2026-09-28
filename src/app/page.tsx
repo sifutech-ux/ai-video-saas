@@ -248,7 +248,7 @@ export default function Home() {
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Contoh: Seekor kucing angkasa lepas..."
-                  className="w-full h-20 bg-black/25 border border-white/10 rounded-[14px] p-3 text-sm focus:outline-none focus:border-[#ff7ab8] transition resize-none placeholder:text-[var(--muted)]"
+                  className="w-full h-20 bg-black/25 border border-white/10 rounded-[14px] p-3 text-sm focus:outline-none focus:border-[#b28bff] transition resize-none placeholder:text-[var(--muted)]"
                 />
               </div>
 

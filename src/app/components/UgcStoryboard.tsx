@@ -305,7 +305,7 @@ export default function UgcStoryboard() {
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
             placeholder="Contoh: Dried Fruit Dunia"
-            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#ff7ab8]"
+            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
           />
         </div>
 
@@ -316,7 +316,7 @@ export default function UgcStoryboard() {
             value={productBenefits}
             onChange={(e) => setProductBenefits(e.target.value)}
             placeholder="Contoh: Fresh, buah tin lembut, manis semulajadi"
-            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#ff7ab8]"
+            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
           />
         </div>
 
@@ -327,7 +327,7 @@ export default function UgcStoryboard() {
             value={targetAudience}
             onChange={(e) => setTargetAudience(e.target.value)}
             placeholder="Contoh: Peminat snek sihat & ibu-ibu"
-            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#ff7ab8]"
+            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
           />
         </div>
       </div>
