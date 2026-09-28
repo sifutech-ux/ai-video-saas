@@ -4,6 +4,10 @@ import { denied, requireStudio } from '@/lib/studio-guard'
 import { writeSession } from '@/lib/studio-cookie'
 import { rememberJob, START_CREDITS } from '@/lib/studio-session'
 import { cleanAspect, directStudioPrompt } from '@/lib/studio-prompt'
+import { audioDataUrl, synthesizeMalay } from '@/lib/malay-voice'
+
+export const maxDuration = 60
+export const runtime = 'nodejs'
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
@@ -55,11 +59,7 @@ export async function POST(req: Request) {
       let finalAudio = customAudio
 
       if (!finalAudio && scriptMalay) {
-        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(scriptMalay)}&tl=ms&client=tw-ob`
-        const audioRes = await fetch(ttsUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        if (!audioRes.ok) throw new Error('Gagal memuat turun audio TTS')
-        const audioBuffer = await audioRes.arrayBuffer()
-        finalAudio = `data:audio/mp3;base64,${Buffer.from(audioBuffer).toString('base64')}`
+        finalAudio = audioDataUrl(await synthesizeMalay(scriptMalay))
       }
 
       if (!finalAudio) {
