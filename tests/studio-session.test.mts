@@ -11,7 +11,9 @@ import {
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection } from '../src/lib/malay-voice.ts'
-import { dressStoryboard, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
+import { dressStoryboard, oneAd, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
+import { sceneOutputUrl, SCENE_MISS, restageImage } from '../src/lib/restage-image.ts'
+import { publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
 import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import { parseStoryboard, publicGeminiError } from '../src/lib/gemini-text.ts'
@@ -154,6 +156,66 @@ test('arah iklan menukar skrip dan klip produk', () => {
   assert.match(placePrompt('live', 'orang'), /face identical/)
   assert.match(placePrompt('live', 'produk'), /bright live-selling table/)
   assert.match(placePrompt('pelancaran', 'produk'), /pedestal/)
+  assert.match(live, /2 adegan/)
+  const packed = oneAd({
+    title: 'Lemon',
+    scenes: [
+      { type: 'avatar', title: 'A1', sceneNumber: 1 },
+      { type: 'b-roll', title: 'B1', sceneNumber: 2 },
+      { type: 'avatar', title: 'A2', sceneNumber: 3 },
+      { type: 'b-roll', title: 'B2', sceneNumber: 4 },
+    ],
+  })
+  assert.equal(packed.scenes.length, 2)
+  assert.equal(packed.scenes[0].title, 'Penyampai')
+  assert.equal(packed.scenes[0].sceneNumber, 1)
+  assert.equal(packed.scenes[1].title, 'Produk')
+  assert.equal(packed.scenes[1].type, 'b-roll')
+})
+
+test('scene baharu hanya diterima dari pautan https', async () => {
+  assert.equal(sceneOutputUrl('https://replicate.delivery/scene.jpg'), 'https://replicate.delivery/scene.jpg')
+  assert.equal(sceneOutputUrl(['https://replicate.delivery/scene.jpg']), 'https://replicate.delivery/scene.jpg')
+  assert.equal(sceneOutputUrl('data:image/png;base64,abc'), null)
+  const url = await restageImage(
+    {
+      predictions: {
+        async create() {
+          return { id: 'pred', status: 'succeeded', output: 'https://replicate.delivery/scene.jpg' }
+        },
+        async get() {
+          return { id: 'pred', status: 'failed' }
+        },
+      },
+    },
+    'https://replicate.delivery/in.jpg',
+    'place the person'
+  )
+  assert.equal(url, 'https://replicate.delivery/scene.jpg')
+  await assert.rejects(
+    () => restageImage(
+      {
+        predictions: {
+          async create() {
+            return { id: 'pred', status: 'failed', output: null }
+          },
+          async get() {
+            return { id: 'pred', status: 'failed' }
+          },
+        },
+      },
+      'https://replicate.delivery/in.jpg',
+      'place the pack'
+    ),
+    new RegExp(SCENE_MISS)
+  )
+})
+
+test('cantuman video tidak dedahkan laluan pelayan', () => {
+  const raw = 'spawnSync /ROOT/node_modules/ffmpeg-static/ffmpeg ENOENT'
+  assert.equal(publicStitchError(raw), 'Cantuman video belum tersedia pada pelayan. Sila cuba sekali lagi.')
+  assert.equal(resolveFfmpeg(['/ROOT/ffmpeg', '/var/task/ffmpeg'], (file) => file.startsWith('/var')), '/var/task/ffmpeg')
+  assert.throws(() => resolveFfmpeg(['/ROOT/ffmpeg'], () => false), /tidak tersedia/)
 })
 
 test('ralat muat naik video dipendekkan', () => {

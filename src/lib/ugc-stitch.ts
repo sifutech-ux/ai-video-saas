@@ -9,9 +9,27 @@ export type StitchScene = {
   audio?: Buffer | null
 }
 
+export function resolveFfmpeg(
+  candidates: Array<string | null | undefined>,
+  exists: (file: string) => boolean
+) {
+  const found = candidates.find((candidate) => typeof candidate === 'string' && candidate.length > 0 && exists(candidate))
+  if (!found) throw new Error('Alat cantuman video tidak tersedia pada pelayan ini.')
+  return found
+}
+
+export function publicStitchError(message: string) {
+  if (/ENOENT|spawnSync/i.test(message)) {
+    return 'Cantuman video belum tersedia pada pelayan. Sila cuba sekali lagi.'
+  }
+  return message
+}
+
 function ffmpeg() {
-  if (!ffmpegPath) throw new Error('Alat cantuman video tidak tersedia pada pelayan ini.')
-  return ffmpegPath
+  return resolveFfmpeg(
+    [path.join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg'), ffmpegPath],
+    (file) => fs.existsSync(file)
+  )
 }
 
 function run(args: string[]) {

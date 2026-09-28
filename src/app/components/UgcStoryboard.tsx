@@ -16,12 +16,6 @@ interface ScriptData {
   scenes: Scene[]
 }
 
-interface SceneState {
-  isGenerating: boolean
-  status: string
-  url: string
-}
-
 export default function UgcStoryboard() {
   const [productName, setProductName] = useState('')
   const [productBenefits, setProductBenefits] = useState('')
@@ -33,14 +27,11 @@ export default function UgcStoryboard() {
   // State Gambar & Audio Rujukan
   const [avatarImage, setAvatarImage] = useState<string | null>(null)
   const [productImage, setProductImage] = useState<string | null>(null)
-  const [customAudios, setCustomAudios] = useState<{ [key: number]: string }>({})
 
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
 
-  const [sceneStates, setSceneStates] = useState<{ [key: number]: SceneState }>({})
   const [stitchedVideo, setStitchedVideo] = useState('')
-  const [isStitching, setIsStitching] = useState(false)
   const [presenterVoice, setPresenterVoice] = useState<'lelaki' | 'perempuan'>('lelaki')
   const [direction, setDirection] = useState<UgcDirection>('santai')
   const [scriptDirection, setScriptDirection] = useState<UgcDirection>('santai')
@@ -52,17 +43,6 @@ export default function UgcStoryboard() {
       reader.onloadend = () => {
         if (type === 'avatar') setAvatarImage(reader.result as string)
         else setProductImage(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, sceneNumber: number) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setCustomAudios((prev) => ({ ...prev, [sceneNumber]: reader.result as string }))
       }
       reader.readAsDataURL(file)
     }
@@ -95,10 +75,6 @@ export default function UgcStoryboard() {
       const interval = setInterval(async () => {
         if (Date.now() - started > 12 * 60 * 1000) {
           clearInterval(interval)
-          setSceneStates((prev) => ({
-            ...prev,
-            [scene.sceneNumber]: { isGenerating: false, status: 'Masa tamat', url: '' },
-          }))
           reject(new Error('Masa tamat'))
           return
         }
@@ -111,42 +87,21 @@ export default function UgcStoryboard() {
           if (data.status === 'succeeded') {
             clearInterval(interval)
             const url = Array.isArray(data.output) ? data.output[0] : data.output
-            setSceneStates((prev) => ({
-              ...prev,
-              [scene.sceneNumber]: { isGenerating: false, status: 'Siap', url },
-            }))
             resolve(url)
           } else if (data.status === 'failed' || data.status === 'canceled') {
             clearInterval(interval)
             if (scene.type === 'avatar' && !sandaran && data.busy) {
-              setSceneStates((prev) => ({
-                ...prev,
-                [scene.sceneNumber]: { isGenerating: true, status: 'Cara licin sibuk, mencuba cara lama...', url: '' },
-              }))
+              setBuildLabel('Cara licin sibuk, mencuba cara lama...')
               requestScene(scene, true, spoken).then(resolve, reject)
               return
             }
-            const errorMsg = data.error || 'Penjanaan video gagal di pelayan AI.'
-            setSceneStates((prev) => ({
-              ...prev,
-              [scene.sceneNumber]: { isGenerating: false, status: 'Gagal', url: '' },
-            }))
-            reject(new Error(errorMsg))
-          } else {
-            setSceneStates((prev) => ({
-              ...prev,
-              [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: `${data.status}...` },
-            }))
+            reject(new Error(data.error || 'Penjanaan video gagal di pelayan AI.'))
           }
         } catch (err) {
           misses += 1
           if (misses >= 5) {
             clearInterval(interval)
             console.error('Ralat status adegan:', err)
-            setSceneStates((prev) => ({
-              ...prev,
-              [scene.sceneNumber]: { isGenerating: false, status: 'Sambungan terputus', url: '' },
-            }))
             reject(err instanceof Error ? err : new Error('Sambungan terputus'))
           }
         }
@@ -162,11 +117,6 @@ export default function UgcStoryboard() {
       throw new Error('Sila muat naik gambar produk.')
     }
 
-    setSceneStates((prev) => ({
-      ...prev,
-      [scene.sceneNumber]: { isGenerating: true, status: 'Menyusun scene...', url: '' },
-    }))
-
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -176,55 +126,32 @@ export default function UgcStoryboard() {
         imageUrl: selectedImage,
         type: scene.type,
         scriptMalay: scene.scriptMalay,
-        customAudio: customAudios[scene.sceneNumber] || null,
         voice: presenterVoice,
         direction: spoken,
         motion: sandaran ? 'sandaran' : undefined,
       }),
     })
     const data = await res.json()
-    if (!res.ok) {
-      setSceneStates((prev) => ({
-        ...prev,
-        [scene.sceneNumber]: { isGenerating: false, status: '❌ Ralat', url: '' },
-      }))
-      throw new Error(data.error || 'Gagal memproses adegan')
-    }
-    setSceneStates((prev) => ({
-      ...prev,
-      [scene.sceneNumber]: { ...prev[scene.sceneNumber], status: '🎬 Diproses...' },
-    }))
+    if (!res.ok) throw new Error(data.error || 'Gagal memproses adegan')
     return waitForJob(data.jobId, scene, sandaran, spoken)
   }
 
-  const handleGenerateSceneVideo = async (scene: Scene) => {
-    try {
-      await requestScene(scene)
-    } catch (err: any) {
-      alert(`Ralat adegan ${scene.sceneNumber}: ${err.message}`)
-    }
-  }
-
   const stitchClips = async (clips: { url: string; scriptMalay: string; type: string }[]) => {
-    if (clips.length < 2) return
-    setIsStitching(true)
-    try {
-      const res = await fetch('/api/stitch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes: clips, voice: presenterVoice }),
-      })
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.error || 'Gagal mencantumkan video')
-      }
-      const videoBlob = await res.blob()
-      setStitchedVideo(URL.createObjectURL(videoBlob))
-    } catch (err: any) {
-      alert(`Ralat cantum video: ${err.message}`)
-    } finally {
-      setIsStitching(false)
+    setBuildLabel('Menyatukan iklan...')
+    const res = await fetch('/api/stitch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenes: clips, voice: presenterVoice }),
+    })
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}))
+      throw new Error(errData.error || 'Gagal mencantumkan video')
     }
+    const videoBlob = await res.blob()
+    setStitchedVideo((current) => {
+      if (current) URL.revokeObjectURL(current)
+      return URL.createObjectURL(videoBlob)
+    })
   }
 
   const handleBuildAd = async () => {
@@ -237,8 +164,10 @@ export default function UgcStoryboard() {
 
     setIsLoading(true)
     setBuildLabel('Menulis skrip...')
-    setSceneStates({})
-    setStitchedVideo('')
+    setStitchedVideo((current) => {
+      if (current) URL.revokeObjectURL(current)
+      return ''
+    })
     try {
       const res = await fetch('/api/script', {
         method: 'POST',
@@ -252,21 +181,14 @@ export default function UgcStoryboard() {
       setScriptDirection(direction)
 
       const ready: { url: string; scriptMalay: string; type: string }[] = []
-      for (let index = 0; index < board.scenes.length; index += 1) {
-        const scene = board.scenes[index]
-        setBuildLabel(`Adegan ${index + 1} daripada ${board.scenes.length}`)
-        try {
-          const url = await requestScene(scene, false, direction)
-          ready.push({ url, scriptMalay: scene.scriptMalay, type: scene.type })
-        } catch (err: any) {
-          alert(`Ralat adegan ${scene.sceneNumber}: ${err.message}`)
-        }
+      for (const scene of board.scenes) {
+        setBuildLabel(scene.type === 'b-roll' ? 'Menyusun produk...' : 'Menyusun penyampai...')
+        const url = await requestScene(scene, false, direction)
+        ready.push({ url, scriptMalay: scene.scriptMalay, type: scene.type })
       }
 
-      if (ready.length >= 2) {
-        setBuildLabel('Mencantumkan iklan...')
-        await stitchClips(ready)
-      }
+      if (ready.length < 2) throw new Error('Iklan belum lengkap. Sila cuba sekali lagi.')
+      await stitchClips(ready)
     } catch (err: any) {
       alert(`Ralat: ${err.message}`)
     } finally {
@@ -274,47 +196,6 @@ export default function UgcStoryboard() {
       setIsLoading(false)
     }
   }
-
-  const handleStitchVideos = async () => {
-    if (!scriptData) return
-
-    const sceneDataToSend = scriptData.scenes
-      .map((scene) => ({
-        url: sceneStates[scene.sceneNumber]?.url,
-        scriptMalay: scene.scriptMalay,
-        type: scene.type,
-      }))
-      .filter((s) => s.url)
-
-    if (sceneDataToSend.length < 2) {
-      return alert('Sila jana sekurang-kurangnya 2 adegan sebelum mencantumkan video!')
-    }
-
-    setIsStitching(true)
-    try {
-      const res = await fetch('/api/stitch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes: sceneDataToSend, voice: presenterVoice }),
-      })
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.error || 'Gagal mencantumkan video')
-      }
-
-      // Terima respon binary sebagai Blob URL terus untuk elak ralat saiz Base64
-      const videoBlob = await res.blob()
-      const objectUrl = URL.createObjectURL(videoBlob)
-      setStitchedVideo(objectUrl)
-    } catch (err: any) {
-      alert(`Ralat cantum video: ${err.message}`)
-    } finally {
-      setIsStitching(false)
-    }
-  }
-
-  const completedCount = Object.values(sceneStates).filter((s) => s.url).length
 
   return (
     <div className="bs-panel p-6 pt-7 flex flex-col gap-6">
@@ -429,7 +310,7 @@ export default function UgcStoryboard() {
         <p className="text-[11px] text-slate-500">
           {UGC_DIRECTIONS.find((item) => item.id === direction)?.hint}
           {scriptData && direction !== scriptDirection
-            ? ` Skrip semasa ialah ${directionLabel(scriptDirection)}. Jana skrip semula untuk arah ini.`
+            ? ` Tekan Buat iklan sekali lagi untuk ${directionLabel(direction)}.`
             : ''}
         </p>
       </div>
@@ -450,7 +331,7 @@ export default function UgcStoryboard() {
         >
           Perempuan
         </button>
-        <span className="text-[11px] text-slate-500">Lalai lelaki. Klip yang sudah siap kekal sehingga dijana semula.</span>
+        <span className="text-[11px] text-slate-500">Lalai lelaki. Iklan yang sudah siap kekal sehingga dibuat semula.</span>
       </div>
 
       <button
@@ -463,125 +344,35 @@ export default function UgcStoryboard() {
 
       {scriptData && (
         <div className="flex flex-col gap-4 mt-2">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-950 p-4 border border-slate-800 rounded-xl gap-3">
-            <div>
-              <h3 className="text-sm font-bold text-amber-400">📋 {scriptData.title}</h3>
-              <p className="text-[11px] text-slate-400">
-                {buildLabel || `${completedCount}/4 adegan sedia.`} Angka kredit di atas untuk tab Studio.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {completedCount >= 2 && (
-                <button
-                  onClick={handleStitchVideos}
-                  disabled={isStitching || isLoading}
-                  className="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-lg disabled:opacity-50"
-                >
-                  {isStitching ? 'Mencantumkan...' : 'Cantumkan semula'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {scriptData.scenes.map((scene) => {
-              const state = sceneStates[scene.sceneNumber] || { isGenerating: false, status: '', url: '' }
-
-              return (
-                <div key={scene.sceneNumber} className="bg-black/20 border border-white/10 rounded-[14px] p-4 flex flex-col gap-3 justify-between">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-purple-400">{scene.title}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${scene.type === 'avatar' ? 'bg-purple-950 text-purple-300 border border-purple-800' : 'bg-blue-950 text-blue-300 border border-blue-800'}`}>
-                        {scene.type === 'avatar' ? '🗣️ Avatar' : '📹 B-Roll'}
-                      </span>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-0.5">
-                        <p className="text-[11px] text-slate-400 font-medium">Skrip Audio (BM):</p>
-                        <button
-                          type="button"
-                          onClick={() => handlePlayAudio(scene.scriptMalay)}
-                          className="text-[10px] bg-purple-950/60 hover:bg-purple-800 text-purple-300 border border-purple-700 px-2 py-0.5 rounded transition flex items-center gap-1"
-                        >
-                          🔊 Dengar Suara
-                        </button>
-                      </div>
-                      <p className="text-xs text-slate-200 italic bg-slate-900 p-2 rounded-lg border border-slate-800/80">"{scene.scriptMalay}"</p>
-                    </div>
-
-                    {scene.type === 'avatar' && (
-                      <div className="bg-slate-900 p-2 rounded-lg border border-slate-800 flex flex-col gap-1.5">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-semibold text-emerald-400">🎙️ Suara Sendiri (Opsional):</span>
-                          {customAudios[scene.sceneNumber] && (
-                            <button
-                              onClick={() => setCustomAudios((prev) => { const n = { ...prev }; delete n[scene.sceneNumber]; return n })}
-                              className="text-[10px] text-red-400 hover:underline"
-                            >
-                              Padam Audio
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          type="file"
-                          accept="audio/*"
-                          onChange={(e) => handleAudioUpload(e, scene.sceneNumber)}
-                          className="text-[11px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:bg-emerald-950 file:text-emerald-300 hover:file:bg-emerald-800 cursor-pointer"
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <p className="text-[11px] text-slate-400 font-medium mb-0.5">Prompt Visual (AI Video):</p>
-                      <p className="text-[11px] text-slate-400 bg-slate-900 p-2 rounded-lg border border-slate-800/80">{scene.visualPrompt}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 flex flex-col gap-2">
-                    {state.url ? (
-                      <div className="flex flex-col gap-2">
-                        <video
-                          src={state.url}
-                          controls
-                          className="w-full aspect-[9/16] max-h-80 object-contain rounded-lg bg-black"
-                        />
-                        <a
-                          href={state.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download={`scene-${scene.sceneNumber}.mp4`}
-                          className="text-center text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 rounded-lg transition"
-                        >
-                          📥 Muat Turun Klip MP4
-                        </a>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleGenerateSceneVideo(scene)}
-                        disabled={state.isGenerating}
-                        className="w-full py-2 bg-slate-800 hover:bg-purple-600 text-slate-200 font-semibold rounded-lg text-xs transition border border-slate-700 disabled:opacity-50"
-                      >
-                        {state.isGenerating ? state.status : `Jana Klip Adegan ${scene.sceneNumber}`}
-                      </button>
-                    )}
-                  </div>
+          <div className="bg-slate-950 p-4 border border-slate-800 rounded-xl flex flex-col gap-3">
+            <h3 className="text-sm font-bold text-amber-400">{scriptData.title}</h3>
+            {scriptData.scenes.map((scene) => (
+              <div key={scene.sceneNumber}>
+                <div className="flex justify-between items-center mb-0.5">
+                  <p className="text-[11px] text-slate-400 font-medium">{scene.title}</p>
+                  <button
+                    type="button"
+                    onClick={() => handlePlayAudio(scene.scriptMalay)}
+                    className="text-[10px] bg-purple-950/60 hover:bg-purple-800 text-purple-300 border border-purple-700 px-2 py-0.5 rounded transition"
+                  >
+                    Dengar Suara
+                  </button>
                 </div>
-              )
-            })}
+                <p className="text-xs text-slate-200 italic bg-slate-900 p-2 rounded-lg border border-slate-800/80">"{scene.scriptMalay}"</p>
+              </div>
+            ))}
           </div>
 
           {stitchedVideo && (
-            <div className="bg-slate-950 border border-emerald-500/50 p-6 rounded-2xl flex flex-col items-center gap-4 mt-4">
-              <h3 className="text-base font-bold text-emerald-400">🎉 Video Iklan UGC Lengkap (Siap Dicantum Dengan Audio)</h3>
+            <div className="bg-slate-950 border border-emerald-500/50 p-6 rounded-2xl flex flex-col items-center gap-4">
+              <h3 className="text-base font-bold text-emerald-400">Iklan siap</h3>
               <video src={stitchedVideo} controls autoPlay className="w-full max-w-xs h-auto rounded-xl border border-slate-800" />
               <a
                 href={stitchedVideo}
-                download="iklan-ugc-full.mp4"
+                download="iklan-ugc.mp4"
                 className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-6 py-2.5 rounded-xl transition shadow-lg"
               >
-                📥 Muat Turun Video Iklan Penuh (MP4)
+                Muat Turun Iklan (MP4)
               </a>
             </div>
           )}
