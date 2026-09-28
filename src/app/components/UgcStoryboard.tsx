@@ -273,7 +273,7 @@ export default function UgcStoryboard() {
                 placeholder="Contoh: lelaki dewasa 28 tahun, kemeja navy, rambut pendek"
                 className="w-full min-h-24 bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
               />
-              <p className="text-[11px] text-slate-500">Orang dewasa sahaja. Jantina, umur, dan baju. AI letakkan orang itu dalam scene arah yang dipilih.</p>
+              <p className="text-[11px] text-slate-500">Orang dewasa sahaja. Jantina, umur, dan baju. AI cipta orang itu dalam scene arah yang dipilih.</p>
             </>
           )}
         </div>
