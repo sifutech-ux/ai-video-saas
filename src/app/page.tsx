@@ -134,22 +134,27 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-12">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🎬</span>
-          <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-            AI Video Studio Pro
-          </h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="bg-slate-900 border border-slate-800 px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2">
-            <span>🪙 Baki Kredit:</span>
-            <span className="text-amber-400 font-bold">{credits}</span>
+    <div className="min-h-screen text-[var(--text)] flex flex-col pb-12">
+      <header className="max-w-7xl w-full mx-auto px-6 py-5 flex items-center justify-between gap-4">
+        <a href="https://beshareaisolution.com" className="flex items-center gap-2 text-[var(--text)] no-underline">
+          <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#7c9cff" />
+                <stop offset="1" stopColor="#b28bff" />
+              </linearGradient>
+            </defs>
+            <rect width="32" height="32" rx="8" fill="#131734" />
+            <path d="M8 9h16l-8 15z" fill="url(#g)" />
+          </svg>
+          <span className="text-lg font-bold">BeShare <span className="text-[var(--muted)] font-semibold">AI Solution</span></span>
+        </a>
+        <div className="flex items-center gap-3">
+          <div className="border border-white/10 bg-white/5 px-4 py-1.5 rounded-full text-sm flex items-center gap-2">
+            <span className="text-[var(--muted)]">Kredit</span>
+            <span className="font-bold">{credits}</span>
           </div>
-          <button className="bg-purple-600 hover:bg-purple-500 px-4 py-1.5 rounded-lg text-sm font-semibold transition">
-            Top Up
-          </button>
+          <button className="bs-ghost px-4 py-1.5 text-sm font-semibold">Top Up</button>
         </div>
       </header>
 
@@ -157,20 +162,16 @@ export default function Home() {
       <div className="max-w-7xl w-full mx-auto px-6 pt-6 flex gap-3">
         <button
           onClick={() => setActiveTab('studio')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-            activeTab === 'studio'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+          className={`px-4 py-2 text-xs font-bold transition flex items-center gap-2 ${
+            activeTab === 'studio' ? 'bs-btn' : 'bs-ghost text-[var(--muted)]'
           }`}
         >
           <span>🎬</span> Studio Video AI
         </button>
         <button
           onClick={() => setActiveTab('ugc')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
-            activeTab === 'ugc'
-              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-pink-900/30'
-              : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+          className={`px-4 py-2 text-xs font-bold transition flex items-center gap-2 ${
+            activeTab === 'ugc' ? 'bs-btn' : 'bs-ghost text-[var(--muted)]'
           }`}
         >
           <span>✨</span> UGC Ad Creator (TikTok/Reels)
@@ -183,9 +184,9 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Panel Kiri: Input & Tetapan */}
-            <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-5">
+            <div className="lg:col-span-5 bs-panel p-6 pt-7 flex flex-col gap-5">
               <div>
-                <h2 className="text-lg font-semibold mb-1">Jana Video AI</h2>
+                <h2 className="text-lg font-semibold mb-1 bs-title">Jana Video AI</h2>
                 <p className="text-xs text-slate-400">Tukar idea teks atau gambar anda menjadi video sinematik.</p>
               </div>
 
@@ -198,7 +199,7 @@ export default function Home() {
                       key={idx}
                       type="button"
                       onClick={() => setPrompt(preset.text)}
-                      className="text-[11px] bg-slate-950 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-600/50 text-slate-300 px-2.5 py-1 rounded-lg transition"
+                      className="bs-ghost text-[11px] text-[var(--muted)] px-2.5 py-1"
                     >
                       {preset.label}
                     </button>
@@ -247,7 +248,7 @@ export default function Home() {
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Contoh: Seekor kucing angkasa lepas..."
-                  className="w-full h-20 bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm focus:outline-none focus:border-purple-500 transition resize-none placeholder:text-slate-600"
+                  className="w-full h-20 bg-black/25 border border-white/10 rounded-[14px] p-3 text-sm focus:outline-none focus:border-[#ff7ab8] transition resize-none placeholder:text-[var(--muted)]"
                 />
               </div>
 
@@ -262,8 +263,8 @@ export default function Home() {
                       onClick={() => setSelectedStyle(style)}
                       className={`py-1.5 px-2 text-[11px] rounded-lg border font-medium transition ${
                         selectedStyle === style
-                          ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                          ? 'bs-on'
+                          : 'bg-black/25 border-white/10 text-[var(--muted)]'
                       }`}
                     >
                       {style}
@@ -287,8 +288,8 @@ export default function Home() {
                       onClick={() => setAspectRatio(ratio.value)}
                       className={`py-1.5 px-2 text-xs rounded-lg border font-medium transition ${
                         aspectRatio === ratio.value
-                          ? 'bg-purple-600/20 border-purple-500 text-purple-300'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                          ? 'bs-on'
+                          : 'bg-black/25 border-white/10 text-[var(--muted)]'
                       }`}
                     >
                       {ratio.label}
@@ -317,15 +318,15 @@ export default function Home() {
               <button
                 onClick={handleGenerate}
                 disabled={isGenerating}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-semibold rounded-xl transition shadow-lg shadow-purple-900/20 disabled:opacity-50 text-sm mt-1"
+                className="bs-btn w-full py-3 text-sm mt-1 disabled:opacity-50"
               >
                 {isGenerating ? '🔄 Sedang Diproses...' : '🎬 Jana Video (1 Kredit)'}
               </button>
             </div>
 
             {/* Panel Kanan: Hasil & Butang Muat Turun */}
-            <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-              <h2 className="text-lg font-semibold">Hasil & Status Penjanaan</h2>
+            <div className="lg:col-span-7 bs-panel p-6 pt-7 flex flex-col gap-4">
+              <h2 className="text-lg font-semibold bs-title">Hasil & Status Penjanaan</h2>
 
               {statusMessage && (
                 <div className="p-3.5 bg-slate-950 border border-purple-500/30 rounded-xl text-xs text-purple-300">
@@ -376,7 +377,7 @@ export default function Home() {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {history.map((item) => (
-              <div key={item.id} className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
+              <div key={item.id} className="bs-panel p-3 pt-4 flex flex-col gap-2">
                 <video src={item.url} controls className="w-full h-36 object-cover rounded-lg bg-slate-950" />
                 <div className="flex justify-between items-center text-[10px] text-purple-400 font-semibold">
                   <span>Gaya: {item.style}</span>

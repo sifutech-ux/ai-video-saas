@@ -237,10 +237,10 @@ export default function UgcStoryboard() {
   const completedCount = Object.values(sceneStates).filter((s) => s.url).length
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-6 text-slate-100">
+    <div className="bs-panel p-6 pt-7 flex flex-col gap-6">
       <div>
-        <h2 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
-          ✨ UGC Script & Storyboard Generator
+        <h2 className="text-xl font-bold bs-title">
+          UGC Script & Storyboard
         </h2>
         <p className="text-xs text-slate-400 mt-1">
           Muat naik gambar rujukan orang, produk, atau rakam suara sendiri untuk hasil video AI yang realistik.
@@ -305,7 +305,7 @@ export default function UgcStoryboard() {
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
             placeholder="Contoh: Dried Fruit Dunia"
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#ff7ab8]"
           />
         </div>
 
@@ -316,7 +316,7 @@ export default function UgcStoryboard() {
             value={productBenefits}
             onChange={(e) => setProductBenefits(e.target.value)}
             placeholder="Contoh: Fresh, buah tin lembut, manis semulajadi"
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#ff7ab8]"
           />
         </div>
 
@@ -327,7 +327,7 @@ export default function UgcStoryboard() {
             value={targetAudience}
             onChange={(e) => setTargetAudience(e.target.value)}
             placeholder="Contoh: Peminat snek sihat & ibu-ibu"
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500"
+            className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#ff7ab8]"
           />
         </div>
       </div>
@@ -335,7 +335,7 @@ export default function UgcStoryboard() {
       <button
         onClick={handleGenerateScript}
         disabled={isLoading}
-        className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-semibold rounded-xl text-xs transition shadow-lg disabled:opacity-50"
+        className="bs-btn w-full py-3 text-xs disabled:opacity-50"
       >
         {isLoading ? '🧠 Gemini sedang menulis skrip UGC...' : '📝 Jana Skrip & Papan Cerita 4-Adegan'}
       </button>
@@ -352,7 +352,7 @@ export default function UgcStoryboard() {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleGenerateAllScenes}
-                className="py-2 px-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs rounded-xl transition shadow-lg"
+                className="bs-btn py-2 px-3 text-xs"
               >
                 🚀 Jana Kesemua 4 Klip
               </button>
@@ -374,7 +374,7 @@ export default function UgcStoryboard() {
               const state = sceneStates[scene.sceneNumber] || { isGenerating: false, status: '', url: '' }
 
               return (
-                <div key={scene.sceneNumber} className="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 justify-between">
+                <div key={scene.sceneNumber} className="bg-black/20 border border-white/10 rounded-[14px] p-4 flex flex-col gap-3 justify-between">
                   <div className="flex flex-col gap-2">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold text-purple-400">{scene.title}</span>
