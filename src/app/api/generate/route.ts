@@ -4,7 +4,8 @@ import { denied, requireStudio } from '@/lib/studio-guard'
 import { writeSession } from '@/lib/studio-cookie'
 import { rememberJob, START_CREDITS } from '@/lib/studio-session'
 import { cleanAspect, directStudioPrompt } from '@/lib/studio-prompt'
-import { audioDataUrl, synthesizeMalay } from '@/lib/malay-voice'
+import { audioDataUrl, presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
+import { OMNI_MODEL, omniHumanInput, SADTALKER_VERSION, sadTalkerInput } from '@/lib/avatar-motion'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -30,7 +31,8 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { prompt, aspectRatio, imageUrl, type, scriptMalay, customAudio, style } = body
+    const { prompt, aspectRatio, imageUrl, type, scriptMalay, customAudio, style, voice } = body
+    const spokenVoice = presenterVoice(voice)
 
     if (!imageUrl && type === 'avatar') {
       return NextResponse.json({ error: 'Sila muat naik Gambar Avatar!' }, { status: 400 })
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
       let finalAudio = customAudio
 
       if (!finalAudio && scriptMalay) {
-        finalAudio = audioDataUrl(await synthesizeMalay(scriptMalay))
+        finalAudio = audioDataUrl(await synthesizeMalay(scriptMalay, spokenVoice))
       }
 
       if (!finalAudio) {
@@ -69,21 +71,19 @@ export async function POST(req: Request) {
       const createAvatarPrediction = async (retryCount = 0): Promise<any> => {
         try {
           return await replicate.predictions.create({
-            version: '3aa3dac9353cc4d6bd62a8f95957bd844003b401ca4e4a9b33baa574c549d376',
-            input: {
-              source_image: imageUrl,
-              driven_audio: finalAudio,
-              enhancer: 'gfpgan',
-              preprocess: 'full',
-              still: false,
-            },
+            model: OMNI_MODEL,
+            input: omniHumanInput(imageUrl, finalAudio),
           })
         } catch (err: any) {
           if ((err?.status === 429 || err?.message?.includes('429')) && retryCount < 2) {
             await sleep(10500)
             return createAvatarPrediction(retryCount + 1)
           }
-          throw err
+          console.warn('Gerakan semula jadi tidak tersedia, sandaran SadTalker.', err instanceof Error ? err.message : err)
+          return replicate.predictions.create({
+            version: SADTALKER_VERSION,
+            input: sadTalkerInput(imageUrl, finalAudio),
+          })
         }
       }
 

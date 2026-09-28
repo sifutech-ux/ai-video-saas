@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { denied, requireStudio } from '@/lib/studio-guard'
 import { fetchAllowedMedia } from '@/lib/media-url'
-import { synthesizeMalay } from '@/lib/malay-voice'
+import { presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
 import { stitchSceneFiles, type StitchScene } from '@/lib/ugc-stitch'
 
 export const maxDuration = 60
@@ -20,6 +20,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const scenes = Array.isArray(body.scenes) ? (body.scenes as IncomingScene[]) : []
+    const spokenVoice = presenterVoice(body.voice)
     const ready = scenes.filter((scene) => typeof scene.url === 'string' && scene.url)
     if (ready.length < 2) {
       return NextResponse.json({ error: 'Sila sediakan sekurang-kurangnya 2 adegan.' }, { status: 400 })
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
       let audio: Buffer | null = null
       if (scene.type === 'b-roll' && scene.scriptMalay) {
         try {
-          audio = (await synthesizeMalay(scene.scriptMalay)).buffer
+          audio = (await synthesizeMalay(scene.scriptMalay, spokenVoice)).buffer
         } catch (error) {
           console.warn('Suara b-roll tidak digabung.', error instanceof Error ? error.message : error)
         }

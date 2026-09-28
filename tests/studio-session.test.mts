@@ -10,7 +10,8 @@ import {
 } from '../src/lib/studio-session.ts'
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
-import { pcmToWav, speechChunks } from '../src/lib/malay-voice.ts'
+import { geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection } from '../src/lib/malay-voice.ts'
+import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import { parseStoryboard, publicGeminiError } from '../src/lib/gemini-text.ts'
 import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
 import { execFileSync } from 'node:child_process'
@@ -98,6 +99,20 @@ test('skrip panjang dipecahkan supaya suara tidak terputus', () => {
   const wav = pcmToWav(Buffer.alloc(200, 1))
   assert.equal(wav.subarray(0, 4).toString(), 'RIFF')
   assert.equal(wav.length, 244)
+})
+
+test('suara lalai lelaki dan gerakan avatar licin', () => {
+  assert.equal(presenterVoice(undefined), 'lelaki')
+  assert.equal(presenterVoice('perempuan'), 'perempuan')
+  assert.equal(presenterVoice('lain'), 'lelaki')
+  assert.equal(geminiVoiceName('lelaki'), 'Charon')
+  assert.equal(geminiVoiceName('perempuan'), 'Kore')
+  assert.match(speechDirection('Minum ini.', 'lelaki'), /lelaki dewasa/)
+  const motion = omniHumanInput('data:image/jpeg;base64,abc', 'data:audio/wav;base64,def')
+  assert.equal(motion.fast_mode, false)
+  assert.match(motion.prompt, /talks naturally/)
+  assert.equal(motion.image.startsWith('data:image'), true)
+  assert.equal(sadTalkerInput('img', 'aud').still, false)
 })
 
 test('dua klip dicantum menjadi satu video', () => {
