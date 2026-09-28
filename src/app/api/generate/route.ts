@@ -7,6 +7,7 @@ import { cleanAspect, directStudioPrompt } from '@/lib/studio-prompt'
 import { audioDataUrl, presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
 import { OMNI_MODEL, omniHumanInput, SADTALKER_VERSION, sadTalkerInput } from '@/lib/avatar-motion'
 import { ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
+import { hostedAssetUrl, publicVideoError } from '@/lib/replicate-media'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -14,12 +15,9 @@ export const runtime = 'nodejs'
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
 function publicGenerateError(message: string) {
-  if (/authentication token|Unauthenticated/i.test(message)) {
-    return 'Pelayan video belum disambungkan. Kredit tidak ditolak.'
-  }
-  const clean = message.replace(/\s+/g, ' ').trim()
-  if (clean.startsWith('Sila ')) return clean
-  return clean.length > 240 ? `${clean.slice(0, 240)}…` : clean
+  const text = publicVideoError(message)
+  if (text === 'Pelayan video belum disambungkan.') return 'Pelayan video belum disambungkan. Kredit tidak ditolak.'
+  return text
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -35,6 +33,17 @@ export async function POST(req: Request) {
     const { prompt, aspectRatio, imageUrl, type, scriptMalay, customAudio, style, voice } = body
     const spokenVoice = presenterVoice(voice)
     const spokenDirection = ugcDirection(body.direction)
+    const sandaran = body.motion === 'sandaran'
+
+    const asHosted = async (value: string) => {
+      if (!value.startsWith('data:')) return value
+      try {
+        return await hostedAssetUrl(replicate, value)
+      } catch (error) {
+        console.warn('Pautan media tidak tersedia, data asal digunakan.', error instanceof Error ? error.message : error)
+        return value
+      }
+    }
 
     if (!imageUrl && type === 'avatar') {
       return NextResponse.json({ error: 'Sila muat naik Gambar Avatar!' }, { status: 400 })
@@ -70,11 +79,21 @@ export async function POST(req: Request) {
         throw new Error('Sila muat naik fail audio suara atau sediakan skrip!')
       }
 
+      const imageHosted = await asHosted(imageUrl)
+      const audioHosted = await asHosted(finalAudio)
+
+      const createSadTalker = () =>
+        replicate.predictions.create({
+          version: SADTALKER_VERSION,
+          input: sadTalkerInput(imageHosted, audioHosted),
+        })
+
       const createAvatarPrediction = async (retryCount = 0): Promise<any> => {
+        if (sandaran) return createSadTalker()
         try {
           return await replicate.predictions.create({
             model: OMNI_MODEL,
-            input: omniHumanInput(imageUrl, finalAudio, spokenDirection),
+            input: omniHumanInput(imageHosted, audioHosted, spokenDirection),
           })
         } catch (err: any) {
           if ((err?.status === 429 || err?.message?.includes('429')) && retryCount < 2) {
@@ -82,10 +101,7 @@ export async function POST(req: Request) {
             return createAvatarPrediction(retryCount + 1)
           }
           console.warn('Gerakan semula jadi tidak tersedia, sandaran SadTalker.', err instanceof Error ? err.message : err)
-          return replicate.predictions.create({
-            version: SADTALKER_VERSION,
-            input: sadTalkerInput(imageUrl, finalAudio),
-          })
+          return createSadTalker()
         }
       }
 
@@ -106,6 +122,7 @@ export async function POST(req: Request) {
       if (imageUrl) {
         finalPrompt = `${finalPrompt} Subtle natural movement, continuous shot, preserve the reference image.`
       }
+      const frameImage = typeof imageUrl === 'string' && imageUrl ? await asHosted(imageUrl) : undefined
 
       prediction = await replicate.predictions.create({
         model: 'minimax/video-01',
@@ -113,7 +130,7 @@ export async function POST(req: Request) {
           prompt: finalPrompt,
           aspect_ratio: aspect,
           prompt_optimizer: false,
-          first_frame_image: imageUrl || undefined,
+          first_frame_image: frameImage,
         },
       })
     }

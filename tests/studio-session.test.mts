@@ -12,6 +12,7 @@ import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection } from '../src/lib/malay-voice.ts'
 import { dressStoryboard, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
+import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import { parseStoryboard, publicGeminiError } from '../src/lib/gemini-text.ts'
 import { stitchSceneFiles } from '../src/lib/ugc-stitch.ts'
@@ -150,6 +151,20 @@ test('arah iklan menukar skrip dan klip produk', () => {
   assert.match(dressed.scenes[0].visualPrompt, /bright live-selling table/i)
   assert.equal(withDirectionLook(dressed.scenes[0].visualPrompt, 'live', 'b-roll'), dressed.scenes[0].visualPrompt)
   assert.match(dressed.scenes[1].visualPrompt, /original photo/)
+})
+
+test('ralat muat naik video dipendekkan', () => {
+  const raw = 'Failed to get video result: {"code":50501,"message":"Internal RPC Error Upload file failed EulerError"}'
+  assert.equal(providerBusy(raw), true)
+  assert.equal(publicVideoError(raw), 'Pelayan video sedang sibuk. Sila jana adegan ini sekali lagi.')
+  assert.equal(providerBusy('Service is temporarily unavailable. Please try again later. (E004)'), true)
+  const png = Buffer.from('89504e470d0a1a0a' + '00'.repeat(40), 'hex')
+  const url = `data:image/png;base64,${png.toString('base64')}`
+  const decoded = decodeDataUrl(url)
+  assert.equal(decoded?.mime, 'image/png')
+  assert.equal(decoded?.name, 'gambar.png')
+  assert.ok((decoded?.bytes.length || 0) > 32)
+  assert.equal(decodeDataUrl('https://replicate.delivery/file.jpg'), null)
 })
 
 test('dua klip dicantum menjadi satu video', () => {
