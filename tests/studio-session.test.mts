@@ -11,7 +11,7 @@ import {
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { TTS_MODELS, geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection, speechScript } from '../src/lib/malay-voice.ts'
-import { dressStoryboard, oneAd, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
+import { dressStoryboard, localAd, oneAd, placePrompt, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
 import { sceneOutputUrl, SCENE_MISS, restageImage } from '../src/lib/restage-image.ts'
 import { publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
 import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
@@ -92,6 +92,7 @@ test('papan cerita menerima JSON yang dibalut ayat', () => {
     assert.equal(TEXT_MODELS.includes('gemini-2.5-flash' as never), false)
     assert.equal(TEXT_MODELS[0], 'gemini-3.5-flash-lite')
     assert.deepEqual(textThinking('gemini-3.5-flash'), { thinkingLevel: 'MINIMAL' })
+    assert.deepEqual(textThinking('gemini-3.8-flash'), { thinkingLevel: 'LOW' })
     assert.deepEqual(textThinking('gemini-2.5-flash'), { thinkingBudget: 0 })
     const busy = '{"error": {"code":503,"message":"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.","status":"UNAVAILABLE"}}'
     const shown = publicGeminiError(busy)
@@ -183,6 +184,15 @@ test('arah iklan menukar skrip dan klip produk', () => {
   assert.equal(packed.scenes[0].sceneNumber, 1)
   assert.equal(packed.scenes[1].title, 'Produk')
   assert.equal(packed.scenes[1].type, 'b-roll')
+  const spare = dressStoryboard(
+    localAd({ productName: 'Lemon', productBenefits: 'melawaskan perut', direction: 'live' }),
+    'live'
+  )
+  assert.equal(spare.scenes.length, 2)
+  assert.equal(spare.scenes[0].title, 'Penyampai')
+  assert.match(spare.scenes[0].scriptMalay, /beli sekarang/)
+  assert.match(spare.scenes[0].visualPrompt, /bright live-selling table/i)
+  assert.match(spare.scenes[1].scriptMalay, /Lemon/)
 })
 
 test('scene baharu hanya diterima dari pautan https', async () => {

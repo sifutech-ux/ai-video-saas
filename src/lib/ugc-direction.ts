@@ -142,6 +142,43 @@ Bentuk JSON:
 {"title":"tajuk","scenes":[{"sceneNumber":1,"type":"avatar","title":"Penyampai","scriptMalay":"...","visualPrompt":"..."},{"sceneNumber":2,"type":"b-roll","title":"Produk","scriptMalay":"...","visualPrompt":"..."}]}`
 }
 
+function spokenBenefit(value: string) {
+  const clean = value.replace(/\s+/g, ' ').trim()
+  const sentence = clean.split(/(?<=[.!?])\s/)[0] || clean
+  return sentence.length > 70 ? `${sentence.slice(0, 70).trim()}…` : sentence
+}
+
+export function localAd(input: { productName: string; productBenefits: string; direction: UgcDirection }) {
+  const name = input.productName.replace(/\s+/g, ' ').trim()
+  const benefit = spokenBenefit(input.productBenefits)
+  const lines = {
+    santai: {
+      avatar: `${name} ni memang sedap. ${benefit}.`,
+      product: `Tengok ${name}. ${benefit}.`,
+    },
+    live: {
+      avatar: `${name}! ${benefit}. Tekan beg kuning, beli sekarang!`,
+      product: `${name} ada di meja ni. ${benefit}. Dapatkan sekarang!`,
+    },
+    kecantikan: {
+      avatar: `${name}, dekat di meja solek. ${benefit}.`,
+      product: `Tekstur ${name} nampak jelas. ${benefit}.`,
+    },
+    pelancaran: {
+      avatar: `Ini ${name}. ${benefit}.`,
+      product: `${name} di atas pelamin. ${benefit}.`,
+    },
+  } satisfies Record<UgcDirection, { avatar: string; product: string }>
+  const pair = lines[input.direction]
+  return {
+    title: `${name} ${directionLabel(input.direction)}`,
+    scenes: [
+      { sceneNumber: 1, type: 'avatar' as const, title: 'Penyampai', scriptMalay: pair.avatar, visualPrompt: '' },
+      { sceneNumber: 2, type: 'b-roll' as const, title: 'Produk', scriptMalay: pair.product, visualPrompt: '' },
+    ],
+  }
+}
+
 export function oneAd<T extends { scenes?: Array<{ type?: string; title?: string; sceneNumber?: number }> }>(board: T): T {
   const scenes = Array.isArray(board.scenes) ? board.scenes : []
   const avatar = scenes.find((scene) => scene.type === 'avatar') ?? scenes[0]
