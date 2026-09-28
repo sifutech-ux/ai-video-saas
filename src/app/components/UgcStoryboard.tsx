@@ -39,6 +39,7 @@ export default function UgcStoryboard() {
   const [sceneStates, setSceneStates] = useState<{ [key: number]: SceneState }>({})
   const [stitchedVideo, setStitchedVideo] = useState('')
   const [isStitching, setIsStitching] = useState(false)
+  const [presenterVoice, setPresenterVoice] = useState<'lelaki' | 'perempuan'>('lelaki')
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'product') => {
     const file = e.target.files?.[0]
@@ -92,7 +93,7 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voice: presenterVoice }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -111,7 +112,7 @@ export default function UgcStoryboard() {
     const started = Date.now()
     let misses = 0
     const interval = setInterval(async () => {
-      if (Date.now() - started > 8 * 60 * 1000) {
+      if (Date.now() - started > 12 * 60 * 1000) {
         clearInterval(interval)
         setSceneStates((prev) => ({
           ...prev,
@@ -183,6 +184,7 @@ export default function UgcStoryboard() {
           type: scene.type,
           scriptMalay: scene.scriptMalay,
           customAudio: customAudios[scene.sceneNumber] || null,
+          voice: presenterVoice,
         }),
       })
 
@@ -236,7 +238,7 @@ export default function UgcStoryboard() {
       const res = await fetch('/api/stitch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenes: sceneDataToSend }),
+        body: JSON.stringify({ scenes: sceneDataToSend, voice: presenterVoice }),
       })
 
       if (!res.ok) {
@@ -272,7 +274,7 @@ export default function UgcStoryboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-950 p-4 border border-slate-800 rounded-xl">
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-purple-400 flex justify-between">
-            <span>👩🏻 Gambar Avatar / Model (Opsional)</span>
+            <span>Gambar Avatar / Model (Opsional)</span>
             {avatarImage && (
               <button onClick={() => setAvatarImage(null)} className="text-[10px] text-red-400 hover:underline">Padam</button>
             )}
@@ -351,6 +353,25 @@ export default function UgcStoryboard() {
             className="w-full bg-black/25 border border-white/10 rounded-[14px] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[#b28bff]"
           />
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-slate-300">Suara presenter</span>
+        <button
+          type="button"
+          onClick={() => setPresenterVoice('lelaki')}
+          className={`text-xs px-3 py-1 rounded-full border ${presenterVoice === 'lelaki' ? 'bs-on' : 'border-white/10 text-slate-400'}`}
+        >
+          Lelaki
+        </button>
+        <button
+          type="button"
+          onClick={() => setPresenterVoice('perempuan')}
+          className={`text-xs px-3 py-1 rounded-full border ${presenterVoice === 'perempuan' ? 'bs-on' : 'border-white/10 text-slate-400'}`}
+        >
+          Perempuan
+        </button>
+        <span className="text-[11px] text-slate-500">Lalai lelaki. Klip yang sudah siap kekal sehingga dijana semula.</span>
       </div>
 
       <button

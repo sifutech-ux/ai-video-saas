@@ -2,6 +2,24 @@ import { GoogleGenAI, Modality } from '@google/genai'
 
 const TTS_MODELS = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts']
 
+export type PresenterVoice = 'lelaki' | 'perempuan'
+
+export function presenterVoice(value: unknown): PresenterVoice {
+  return value === 'perempuan' ? 'perempuan' : 'lelaki'
+}
+
+export function geminiVoiceName(voice: PresenterVoice) {
+  return voice === 'perempuan' ? 'Kore' : 'Charon'
+}
+
+export function speechDirection(text: string, voice: PresenterVoice) {
+  const tone =
+    voice === 'perempuan'
+      ? 'suara perempuan dewasa, nada tenang dan mesra'
+      : 'suara lelaki dewasa, nada tenang dan mesra'
+  return `Baca iklan ini dalam Bahasa Malaysia, ${tone}, sebutan jelas: ${text}`
+}
+
 export function speechChunks(text: string, max = 180) {
   const clean = text.replace(/\s+/g, ' ').trim()
   if (!clean) return []
@@ -56,7 +74,7 @@ export type SpokenAudio = {
   mime: 'audio/wav' | 'audio/mpeg'
 }
 
-async function geminiSpeech(text: string): Promise<SpokenAudio | null> {
+async function geminiSpeech(text: string, voice: PresenterVoice): Promise<SpokenAudio | null> {
   const key = process.env.GEMINI_API_KEY
   if (!key) return null
   const ai = new GoogleGenAI({ apiKey: key })
@@ -66,11 +84,11 @@ async function geminiSpeech(text: string): Promise<SpokenAudio | null> {
       const response = await Promise.race([
         ai.models.generateContent({
           model,
-          contents: `Baca iklan ini dalam Bahasa Malaysia, suara mesra dan jelas: ${text}`,
+          contents: speechDirection(text, voice),
           config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiVoiceName(voice) } },
             },
           },
         }),
@@ -105,11 +123,14 @@ async function translateSpeech(text: string): Promise<SpokenAudio> {
   return { buffer: Buffer.concat(parts), mime: 'audio/mpeg' }
 }
 
-export async function synthesizeMalay(text: string): Promise<SpokenAudio> {
+export async function synthesizeMalay(text: string, voice: PresenterVoice = 'lelaki'): Promise<SpokenAudio> {
   const spoken = text.replace(/\s+/g, ' ').trim().slice(0, 800)
   if (!spoken) throw new Error('Sila sediakan skrip suara.')
-  const gemini = await geminiSpeech(spoken)
+  const gemini = await geminiSpeech(spoken, voice)
   if (gemini) return gemini
+  if (voice === 'lelaki') {
+    throw new Error('Suara lelaki tidak dapat dijana sekarang. Sila cuba sekali lagi.')
+  }
   return translateSpeech(spoken)
 }
 

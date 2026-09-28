@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { denied, requireStudio } from '@/lib/studio-guard'
-import { synthesizeMalay } from '@/lib/malay-voice'
+import { presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
 
 export const maxDuration = 30
 export const runtime = 'nodejs'
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
     const text = typeof body.text === 'string' ? body.text : ''
-    const audio = await synthesizeMalay(text)
+    const audio = await synthesizeMalay(text, presenterVoice(body.voice))
     return new NextResponse(new Uint8Array(audio.buffer), {
       headers: {
         'Content-Type': audio.mime,
