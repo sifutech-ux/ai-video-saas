@@ -6,9 +6,9 @@ import { rememberJob, START_CREDITS } from '@/lib/studio-session'
 import { cleanAspect, directStudioPrompt } from '@/lib/studio-prompt'
 import { audioDataUrl, presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
 import { OMNI_MODEL, omniHumanInput, SADTALKER_VERSION, sadTalkerInput } from '@/lib/avatar-motion'
-import { placePrompt, ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
+import { fitSpokenLine, placePrompt, PRESENTER_WORDS, ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
 import { hostedAssetUrl, publicVideoError } from '@/lib/replicate-media'
-import { createAvatarStill, restageImage } from '@/lib/restage-image'
+import { createAvatarStill, holdProduct, restageImage } from '@/lib/restage-image'
 import { adultAvatarNote, avatarStillPrompt, presenterMode } from '@/lib/avatar-still'
 
 export const maxDuration = 60
@@ -74,25 +74,34 @@ export async function POST(req: Request) {
     let enhancedPrompt = ''
 
     if (type === 'avatar') {
+      const productSource = typeof body.productImageUrl === 'string' ? body.productImageUrl : ''
+      if (!productSource) throw new Error('Sila muat naik gambar produk.')
+      if (productSource.length > 2_500_000) {
+        return NextResponse.json({ error: 'Gambar terlalu besar. Sila guna gambar yang lebih kecil.' }, { status: 413 })
+      }
+      const spokenLine = typeof scriptMalay === 'string' ? fitSpokenLine(scriptMalay, PRESENTER_WORDS) : ''
+      const audioPromise = (!customAudio && spokenLine
+        ? synthesizeMalay(spokenLine, spokenVoice).then((audio) => audioDataUrl(audio))
+        : Promise.resolve(typeof customAudio === 'string' ? customAudio : '')
+      ).catch((error: unknown) => error)
       let stagedPromise: Promise<string>
       if (avatarFromNote) {
         stagedPromise = createAvatarStill(replicate, avatarStillPrompt(spokenDirection, body.gambaran))
       } else {
         const sourceImage = await hostedAssetUrl(replicate, imageUrl)
-        stagedPromise = restageImage(replicate, sourceImage, placePrompt(spokenDirection, 'orang'))
+        stagedPromise = restageImage(replicate, sourceImage, placePrompt(spokenDirection, 'orang'), 22000)
       }
-      let finalAudio = customAudio
-
-      if (!finalAudio && scriptMalay) {
-        finalAudio = audioDataUrl(await synthesizeMalay(scriptMalay, spokenVoice))
-      }
+      const personUrl = await stagedPromise
+      const productUrl = await hostedAssetUrl(replicate, productSource)
+      const imageHosted = await holdProduct(replicate, personUrl, productUrl)
+      const audioResult = await audioPromise
+      if (audioResult instanceof Error) throw audioResult
+      const finalAudio = audioResult
 
       if (!finalAudio) {
         throw new Error('Sila muat naik fail audio suara atau sediakan skrip!')
       }
 
-      const staged = await stagedPromise
-      const imageHosted = staged
       const audioHosted = await hostedAssetUrl(replicate, finalAudio)
 
       const createSadTalker = () =>

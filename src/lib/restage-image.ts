@@ -1,7 +1,9 @@
 export const SCENE_MODEL = 'black-forest-labs/flux-kontext-pro'
-export const AVATAR_STILL_MODEL = 'black-forest-labs/flux-schnell'
+export const AVATAR_STILL_MODEL = 'black-forest-labs/flux-1.1-pro'
+export const HOLD_MODEL = 'flux-kontext-apps/multi-image-kontext-pro'
 export const SCENE_MISS = 'Scene baharu tidak tersusun. Sila cuba sekali lagi.'
 export const AVATAR_STILL_MISS = 'Avatar tidak dapat dicipta sekarang. Sila cuba sekali lagi.'
+export const HOLD_MISS = 'Produk tidak dapat diletakkan di tangan penyampai. Sila cuba sekali lagi.'
 
 type ScenePrediction = {
   id: string
@@ -61,14 +63,35 @@ export async function restageImage(
   return url
 }
 
-function stillFailure(error: unknown) {
-  const text = error instanceof Error ? error.message : ''
-  if (/Unauthenticated|authentication token/i.test(text)) return error instanceof Error ? error : new Error(text)
-  console.warn('Avatar still gagal.', text || error)
-  return new Error(AVATAR_STILL_MISS)
+export function holdProductPrompt() {
+  return 'The adult in the first image holds the exact product pack from the second image in one hand at chest height. The pack is small, label facing the camera, logo and colors unchanged. Real fingers and a natural grip, with shadows that match the light. Keep this exact face, clothes, age, and the simple background. Natural skin with pores, real fabric, photoreal phone photo. No crowd, no shop, no signs, no extra people, no extra text. Vertical 9:16.'
 }
 
-export async function createAvatarStill(predictor: ScenePredictor, prompt: string, waitMs = 38000) {
+function stillFailure(error: unknown, miss: string) {
+  const text = error instanceof Error ? error.message : ''
+  if (/Unauthenticated|authentication token/i.test(text)) return error instanceof Error ? error : new Error(text)
+  console.warn('Gambar penyampai gagal.', text || error)
+  return new Error(miss)
+}
+
+async function waitForScene(predictor: ScenePredictor, current: ScenePrediction, waitMs: number, miss: string) {
+  const deadline = Date.now() + waitMs
+  let latest = current
+  while (latest.status !== 'succeeded' && latest.status !== 'failed' && latest.status !== 'canceled') {
+    if (Date.now() >= deadline) throw new Error(miss)
+    await sleep(1500)
+    try {
+      latest = await predictor.predictions.get(latest.id)
+    } catch (error) {
+      throw stillFailure(error, miss)
+    }
+  }
+  const url = latest.status === 'succeeded' ? sceneOutputUrl(latest.output) : null
+  if (!url) throw new Error(miss)
+  return url
+}
+
+export async function createAvatarStill(predictor: ScenePredictor, prompt: string, waitMs = 22000) {
   let current: ScenePrediction
   try {
     current = await predictor.predictions.create({
@@ -76,26 +99,41 @@ export async function createAvatarStill(predictor: ScenePredictor, prompt: strin
       input: {
         prompt,
         aspect_ratio: '9:16',
-        num_outputs: 1,
         output_format: 'jpg',
-        output_quality: 90,
-        go_fast: true,
+        output_quality: 95,
+        prompt_upsampling: false,
+        safety_tolerance: 2,
       },
     })
   } catch (error) {
-    throw stillFailure(error)
+    throw stillFailure(error, AVATAR_STILL_MISS)
   }
-  const deadline = Date.now() + waitMs
-  while (current.status !== 'succeeded' && current.status !== 'failed' && current.status !== 'canceled') {
-    if (Date.now() >= deadline) throw new Error(AVATAR_STILL_MISS)
-    await sleep(1500)
-    try {
-      current = await predictor.predictions.get(current.id)
-    } catch (error) {
-      throw stillFailure(error)
-    }
+  return waitForScene(predictor, current, waitMs, AVATAR_STILL_MISS)
+}
+
+export async function holdProduct(
+  predictor: ScenePredictor,
+  personUrl: string,
+  productUrl: string,
+  prompt = holdProductPrompt(),
+  waitMs = 20000
+) {
+  if (!personUrl.startsWith('https://') || !productUrl.startsWith('https://')) throw new Error(HOLD_MISS)
+  let current: ScenePrediction
+  try {
+    current = await predictor.predictions.create({
+      model: HOLD_MODEL,
+      input: {
+        prompt,
+        input_image_1: personUrl,
+        input_image_2: productUrl,
+        aspect_ratio: '9:16',
+        output_format: 'jpg',
+        safety_tolerance: 2,
+      },
+    })
+  } catch (error) {
+    throw stillFailure(error, HOLD_MISS)
   }
-  const url = current.status === 'succeeded' ? sceneOutputUrl(current.output) : null
-  if (!url) throw new Error(AVATAR_STILL_MISS)
-  return url
+  return waitForScene(predictor, current, waitMs, HOLD_MISS)
 }

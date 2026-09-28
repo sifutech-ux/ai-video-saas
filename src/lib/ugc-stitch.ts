@@ -43,6 +43,25 @@ function clipHasAudio(file: string) {
 
 const VIDEO_ENCODE = ['-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac']
 
+export function framePadSeconds(videoSeconds: number, audioSeconds: number, maxPad = 10) {
+  if (!(videoSeconds >= 0.2) || !(audioSeconds >= 0.2)) return 0
+  const gap = audioSeconds - videoSeconds
+  if (gap < 0.3) return 0
+  return Math.min(maxPad, Math.round(gap * 100) / 100)
+}
+
+function probeSeconds(file: string) {
+  const result = spawnSync(ffmpeg(), ['-hide_banner', '-i', file], { encoding: 'utf8' })
+  const match = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(result.stderr || '')
+  if (!match) return 0
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])
+}
+
+function pictureFilter(padSeconds: number) {
+  const base = 'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24'
+  return padSeconds > 0 ? `${base},tpad=stop_mode=clone:stop_duration=${padSeconds}` : base
+}
+
 export function stitchSceneFiles(scenes: StitchScene[]) {
   if (scenes.length < 2) throw new Error('Sila sediakan sekurang-kurangnya 2 adegan.')
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ugc-'))
@@ -53,10 +72,11 @@ export function stitchSceneFiles(scenes: StitchScene[]) {
       const videoPath = path.join(dir, `in-${index}.mp4`)
       const outPath = path.join(dir, `out-${index}.mp4`)
       fs.writeFileSync(videoPath, scene.video)
-      const picture = 'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24'
+      const still = pictureFilter(0)
       if (scene.audio && scene.audio.length > 0) {
         const audioPath = path.join(dir, `audio-${index}`)
         fs.writeFileSync(audioPath, scene.audio)
+        const picture = pictureFilter(framePadSeconds(probeSeconds(videoPath), probeSeconds(audioPath)))
         run([
           '-y',
           '-i', videoPath,
@@ -72,7 +92,7 @@ export function stitchSceneFiles(scenes: StitchScene[]) {
         run([
           '-y',
           '-i', videoPath,
-          '-filter_complex', `[0:v]${picture}[v];[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a]`,
+          '-filter_complex', `[0:v]${still}[v];[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a]`,
           '-map', '[v]',
           '-map', '[a]',
           ...VIDEO_ENCODE,
@@ -85,7 +105,7 @@ export function stitchSceneFiles(scenes: StitchScene[]) {
           '-i', videoPath,
           '-f', 'lavfi',
           '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
-          '-filter_complex', `[0:v]${picture}[v]`,
+          '-filter_complex', `[0:v]${still}[v]`,
           '-map', '[v]',
           '-map', '1:a:0',
           ...VIDEO_ENCODE,

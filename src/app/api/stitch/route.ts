@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { denied, requireStudio } from '@/lib/studio-guard'
 import { fetchAllowedMedia } from '@/lib/media-url'
 import { presenterVoice, synthesizeMalay } from '@/lib/malay-voice'
+import { fitSpokenLine, PRODUCT_WORDS } from '@/lib/ugc-direction'
 import { publicStitchError, stitchSceneFiles, type StitchScene } from '@/lib/ugc-stitch'
 
 export const maxDuration = 60
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
       let audio: Buffer | null = null
       if (scene.type === 'b-roll' && scene.scriptMalay) {
         try {
-          audio = (await synthesizeMalay(scene.scriptMalay, spokenVoice)).buffer
+          audio = (await synthesizeMalay(fitSpokenLine(scene.scriptMalay, PRODUCT_WORDS), spokenVoice)).buffer
         } catch (error) {
           console.warn('Suara b-roll tidak digabung.', error instanceof Error ? error.message : error)
         }
