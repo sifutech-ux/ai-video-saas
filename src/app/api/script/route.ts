@@ -3,7 +3,7 @@ import { denied, requireStudio } from '@/lib/studio-guard'
 import { askGemini, geminiKey, parseStoryboard, publicGeminiError } from '@/lib/gemini-text'
 import { dressStoryboard, oneAd, scriptPrompt, ugcDirection } from '@/lib/ugc-direction'
 
-export const maxDuration = 30
+export const maxDuration = 60
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {

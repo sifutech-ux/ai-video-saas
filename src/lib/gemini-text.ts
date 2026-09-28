@@ -1,6 +1,11 @@
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 
-export const TEXT_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
+export const TEXT_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash']
+
+export function textThinking(model: string) {
+  if (model.startsWith('gemini-2.')) return { thinkingBudget: 0 }
+  return { thinkingLevel: ThinkingLevel.MINIMAL }
+}
 
 export function geminiKey() {
   return process.env.GEMINI_API_KEY || ''
@@ -14,7 +19,7 @@ export function publicGeminiError(message: string) {
     return 'Kunci Gemini ditolak. Semak GEMINI_API_KEY pada Vercel, kemudian Redeploy.'
   }
   if (/no longer available|NOT_FOUND|not found|is not found/i.test(message)) {
-    return 'Model Gemini lama tidak menerima permintaan. Tekan sekali lagi selepas halaman ini disegarkan.'
+    return 'Penulis skrip Gemini tidak tersedia. Tekan Buat iklan sekali lagi.'
   }
   if (/429|quota|resource exhausted|RESOURCE_EXHAUSTED/i.test(message)) {
     return 'Kuota Gemini penuh sebentar. Tunggu seminit, kemudian tekan sekali lagi.'
@@ -41,7 +46,7 @@ export async function askGemini(prompt: string, options: { json?: boolean; timeo
   const key = geminiKey()
   if (!key) throw new Error(publicGeminiError(''))
   const ai = new GoogleGenAI({ apiKey: key })
-  const timeoutMs = options.timeoutMs ?? 20000
+  const timeoutMs = options.timeoutMs ?? 15000
   let lastError = 'Gemini tidak memulangkan jawapan.'
 
   for (const model of TEXT_MODELS) {
@@ -52,7 +57,7 @@ export async function askGemini(prompt: string, options: { json?: boolean; timeo
           contents: prompt,
           config: {
             ...(options.json ? { responseMimeType: 'application/json' } : {}),
-            thinkingConfig: { thinkingBudget: 0 },
+            thinkingConfig: textThinking(model),
           },
         }),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), timeoutMs)),
