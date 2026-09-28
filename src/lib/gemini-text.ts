@@ -1,9 +1,10 @@
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 
-export const TEXT_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.5-flash']
+export const TEXT_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash']
 
 export function textThinking(model: string) {
   if (model.startsWith('gemini-2.')) return { thinkingBudget: 0 }
+  if (/gemini-3\.[78]/.test(model)) return { thinkingLevel: ThinkingLevel.LOW }
   return { thinkingLevel: ThinkingLevel.MINIMAL }
 }
 
@@ -90,11 +91,5 @@ export async function askGemini(prompt: string, options: { json?: boolean; timeo
 
   const first = await askOnce()
   if (first) return first
-  if (first === '') {
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    const second = await askOnce()
-    if (second) return second
-  }
-
   throw new Error(publicGeminiError(lastError))
 }

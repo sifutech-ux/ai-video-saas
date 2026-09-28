@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { denied, requireStudio } from '@/lib/studio-guard'
 import { askGemini, geminiKey, parseStoryboard, publicGeminiError } from '@/lib/gemini-text'
-import { dressStoryboard, oneAd, scriptPrompt, ugcDirection } from '@/lib/ugc-direction'
+import { dressStoryboard, localAd, oneAd, scriptPrompt, ugcDirection } from '@/lib/ugc-direction'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -24,8 +24,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Sila sediakan Nama Produk dan Kelebihan Utama!' }, { status: 400 })
     }
 
-    const text = await askGemini(scriptPrompt({ productName, productBenefits, targetAudience, direction }), { json: true })
-    const board = dressStoryboard(oneAd(parseStoryboard(text)), direction)
+    let board
+    try {
+      const text = await askGemini(scriptPrompt({ productName, productBenefits, targetAudience, direction }), { json: true })
+      board = dressStoryboard(oneAd(parseStoryboard(text)), direction)
+    } catch (error) {
+      console.warn('Skrip sandaran digunakan.', error instanceof Error ? error.message : error)
+      board = dressStoryboard(localAd({ productName, productBenefits, direction }), direction)
+    }
     return NextResponse.json({ success: true, data: board, direction })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gagal menjana skrip UGC.'
