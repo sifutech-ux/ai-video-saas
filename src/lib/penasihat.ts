@@ -106,9 +106,10 @@ export function localPenasihat(input: {
   const rujuk = needsQualifiedReferral(soalan)
     ? ' Perkara cukai, undang-undang, dan SSM perlu dirujuk kepada orang yang berkelayakan.'
     : ''
+  const jual = /[.!?]$/.test(input.jualan) ? input.jualan : `${input.jualan}.`
   if (input.peringkat === 'mula') {
     return {
-      jawapan: `${input.nama} baru nak bermula. ${input.jualan}${rujuk} Minggu ini, pastikan seorang pelanggan faham tawaran ini dalam satu ayat.`,
+      jawapan: `${input.nama} baru nak bermula. ${jual}${rujuk} Minggu ini, pastikan seorang pelanggan faham tawaran ini dalam satu ayat.`,
       langkah: [
         `Tulis satu ayat tawaran ${input.nama}: apa yang dijual dan kepada siapa.`,
         'Senaraikan sepuluh orang yang mungkin beli, kemudian mesej tiga orang hari ini.',
@@ -118,7 +119,7 @@ export function localPenasihat(input: {
   }
   if (input.peringkat === 'jual') {
     return {
-      jawapan: `${input.nama} sudah ada jualan. ${input.jualan}${rujuk} Minggu ini, ulang apa yang sudah mendatangkan pembeli.`,
+      jawapan: `${input.nama} sudah ada jualan. ${jual}${rujuk} Minggu ini, ulang apa yang sudah mendatangkan pembeli.`,
       langkah: [
         `Tulis tiga sebab pelanggan terakhir beli ${input.nama}.`,
         'Hubungi lima pelanggan lama dan tanya apa yang mereka mahu seterusnya.',
@@ -127,7 +128,7 @@ export function localPenasihat(input: {
     }
   }
   return {
-    jawapan: `${input.nama} nak dikembangkan. ${input.jualan}${rujuk} Minggu ini, dalamkan satu saluran yang sudah berjalan.`,
+    jawapan: `${input.nama} nak dikembangkan. ${jual}${rujuk} Minggu ini, dalamkan satu saluran yang sudah berjalan.`,
     langkah: [
       'Pilih satu saluran jualan yang sudah ada pembeli, dan luangkan masa tetap di situ setiap hari.',
       'Catat berapa pertanyaan masuk dan berapa yang jadi belian.',
