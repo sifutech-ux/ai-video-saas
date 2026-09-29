@@ -8,8 +8,8 @@ import { audioDataUrl, presenterVoice, synthesizeMalay } from '@/lib/malay-voice
 import { OMNI_MODEL, omniHumanInput, SADTALKER_VERSION, sadTalkerInput } from '@/lib/avatar-motion'
 import { fitSpokenLine, placePrompt, PRESENTER_WORDS, ugcDirection, withDirectionLook } from '@/lib/ugc-direction'
 import { hostedAssetUrl, publicVideoError } from '@/lib/replicate-media'
-import { createAvatarStill, holdProduct, restageImage } from '@/lib/restage-image'
-import { adultAvatarNote, avatarStillPrompt, presenterMode } from '@/lib/avatar-still'
+import { holdProduct, restageImage } from '@/lib/restage-image'
+import { adultAvatarNote, avatarHoldingPrompt, faceHoldPrompt, presenterMode } from '@/lib/avatar-still'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -84,16 +84,16 @@ export async function POST(req: Request) {
         ? synthesizeMalay(spokenLine, spokenVoice).then((audio) => audioDataUrl(audio))
         : Promise.resolve(typeof customAudio === 'string' ? customAudio : '')
       ).catch((error: unknown) => (error instanceof Error ? error : new Error('Suara tidak dapat dijana.')))
-      let stagedPromise: Promise<string>
-      if (avatarFromNote) {
-        stagedPromise = createAvatarStill(replicate, avatarStillPrompt(spokenDirection, body.gambaran))
-      } else {
-        const sourceImage = await hostedAssetUrl(replicate, imageUrl)
-        stagedPromise = restageImage(replicate, sourceImage, placePrompt(spokenDirection, 'orang'), 22000)
-      }
-      const personUrl = await stagedPromise
       const productUrl = await hostedAssetUrl(replicate, productSource)
-      const imageHosted = await holdProduct(replicate, personUrl, productUrl)
+      const imageHosted = avatarFromNote
+        ? await restageImage(replicate, productUrl, avatarHoldingPrompt(spokenDirection, body.gambaran), 36000)
+        : await holdProduct(
+            replicate,
+            await hostedAssetUrl(replicate, imageUrl),
+            productUrl,
+            faceHoldPrompt(spokenDirection),
+            36000
+          )
       const audioResult = await audioPromise
       if (audioResult instanceof Error) throw audioResult
       const finalAudio = audioResult

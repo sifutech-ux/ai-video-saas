@@ -12,15 +12,17 @@ import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
 import { TTS_MODELS, geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection, speechScript } from '../src/lib/malay-voice.ts'
 import { dressStoryboard, fitSpokenLine, localAd, oneAd, placePrompt, PRESENTER_WORDS, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
-import { sceneOutputUrl, SCENE_MISS, restageImage, createAvatarStill, holdProduct, HOLD_MISS, HOLD_MODEL, AVATAR_STILL_MISS, AVATAR_STILL_MODEL } from '../src/lib/restage-image.ts'
+import { sceneOutputUrl, SCENE_MISS, SCENE_MODEL, restageImage, createAvatarStill, holdProduct, HOLD_MISS, HOLD_MODEL, AVATAR_STILL_MISS, AVATAR_STILL_MODEL } from '../src/lib/restage-image.ts'
 import { framePadSeconds, publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
 import { decodeDataUrl, providerBusy, publicVideoError } from '../src/lib/replicate-media.ts'
 import { omniHumanInput, sadTalkerInput } from '../src/lib/avatar-motion.ts'
 import {
   adultAvatarNote,
+  avatarHoldingPrompt,
+  avatarStillPrompt,
   AVATAR_MINOR,
   AVATAR_NOTE_MISS,
-  avatarStillPrompt,
+  faceHoldPrompt,
   minorAvatarNote,
   presenterMode,
 } from '../src/lib/avatar-still.ts'
@@ -357,6 +359,35 @@ test('avatar AI cipta orang dewasa dalam scene, muka gambar kekal lalai', async 
   assert.match(avatarStillPrompt('santai', 'perempuan dewasa 27 tahun, t-shirt putih'), /casual UGC tabletop/)
 
   assert.throws(() => avatarStillPrompt('live', 'budak 8 tahun'), new RegExp(AVATAR_MINOR))
+  const holding = avatarHoldingPrompt('live', 'lelaki dewasa 28 tahun, kemeja navy, rambut pendek')
+  assert.match(holding, /exact product pack/)
+  assert.match(holding, /bright live-selling table/)
+  assert.match(holding, /kemeja navy/)
+  assert.match(holding, /logo and colors identical/)
+  assert.throws(() => avatarHoldingPrompt('live', 'budak 8 tahun'), new RegExp(AVATAR_MINOR))
+  assert.match(faceHoldPrompt('live'), /exact face/)
+  assert.match(faceHoldPrompt('live'), /bright live-selling table/)
+  let placed: { model?: string; input?: Record<string, unknown> } | null = null
+  const placedUrl = await restageImage(
+    {
+      predictions: {
+        async create(body) {
+          placed = body
+          return { id: 'pack', status: 'succeeded', output: 'https://replicate.delivery/held.jpg' }
+        },
+        async get() {
+          return { id: 'pack', status: 'failed' }
+        },
+      },
+    },
+    'https://replicate.delivery/pack.jpg',
+    holding
+  )
+  assert.equal(placedUrl, 'https://replicate.delivery/held.jpg')
+  assert.equal(placed?.model, SCENE_MODEL)
+  assert.equal(placed?.input?.input_image, 'https://replicate.delivery/pack.jpg')
+  assert.equal(placed?.input?.aspect_ratio, '9:16')
+  assert.match(String(placed?.input?.prompt), /exact product pack/)
 
   let seen: { model?: string; input?: Record<string, unknown> } | null = null
   const url = await createAvatarStill(
@@ -400,7 +431,8 @@ test('avatar AI cipta orang dewasa dalam scene, muka gambar kekal lalai', async 
   assert.equal(held?.model, HOLD_MODEL)
   assert.equal(held?.input?.input_image_1, 'https://replicate.delivery/person.jpg')
   assert.equal(held?.input?.input_image_2, 'https://replicate.delivery/pack.jpg')
-  assert.equal(held?.input?.aspect_ratio, '9:16')
+  assert.equal(held?.input?.aspect_ratio, 'match_input_image')
+  assert.equal(held?.input?.output_format, 'png')
   assert.match(String(held?.input?.prompt), /exact product pack/)
   await assert.rejects(
     () => holdProduct(
