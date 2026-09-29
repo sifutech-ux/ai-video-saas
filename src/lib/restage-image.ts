@@ -116,7 +116,7 @@ export async function holdProduct(
   personUrl: string,
   productUrl: string,
   prompt = holdProductPrompt(),
-  waitMs = 20000
+  waitMs = 36000
 ) {
   if (!personUrl.startsWith('https://') || !productUrl.startsWith('https://')) throw new Error(HOLD_MISS)
   let current: ScenePrediction
@@ -127,8 +127,8 @@ export async function holdProduct(
         prompt,
         input_image_1: personUrl,
         input_image_2: productUrl,
-        aspect_ratio: '9:16',
-        output_format: 'jpg',
+        aspect_ratio: 'match_input_image',
+        output_format: 'png',
         safety_tolerance: 2,
       },
     })
