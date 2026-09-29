@@ -149,3 +149,52 @@ export function tooManyNotes(key: string, now = Date.now()) {
   row.n += 1
   return row.n > 12
 }
+
+export function penasihatHeaders(origin: string | null) {
+  return {
+    'Access-Control-Allow-Origin': origin && originAllowed(origin) ? origin : 'https://beshareaisolution.com',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    Vary: 'Origin',
+  }
+}
+
+const AUDIO_TYPES = ['audio/webm', 'audio/mp4', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/aac', 'audio/x-m4a']
+
+export function audioMime(value: unknown) {
+  if (typeof value !== 'string') return null
+  const base = value.split(';')[0].trim().toLowerCase()
+  return AUDIO_TYPES.includes(base) ? base : null
+}
+
+export function audioPayload(value: unknown, mime: unknown) {
+  const jenis = audioMime(mime)
+  if (typeof value !== 'string' || !jenis) return null
+  const data = value.replace(/\s/g, '')
+  if (data.length < 100 || data.length > 900_000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return null
+  return { data, mime: jenis }
+}
+
+export function transcribePrompt() {
+  return 'Dengar rakaman ini. Tulis semula apa yang disebut, dalam ejaan Bahasa Malaysia. Pulangkan ayat yang disebut sahaja. Jangan jawab soalan itu. Jika tiada suara yang jelas, pulangkan perkataan kosong.'
+}
+
+export function parseTranscript(text: string) {
+  const clean = text
+    .replace(/^(transkrip|ayat)\s*:\s*/i, '')
+    .replace(/^["'\s]+|["'\s]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!clean || /^kosong$/i.test(clean) || clean.length < 2) return ''
+  return clean.slice(0, 600)
+}
+
+export function penasihatSpoken(jawapan: string, langkah: string[] = []) {
+  const ayat = jawapan.replace(/\s+/g, ' ').trim()
+  if (!ayat) throw new Error('Tiada ayat untuk dibaca.')
+  const tiga = langkah.map((item) => item.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 3)
+  if (tiga.length === 0) return ayat.slice(0, 700)
+  const nombor = ['Satu', 'Dua', 'Tiga']
+  const senarai = tiga.map((item, index) => `${nombor[index]}. ${item}`).join(' ')
+  return `${ayat} Langkah minggu ini. ${senarai}`.slice(0, 700)
+}
