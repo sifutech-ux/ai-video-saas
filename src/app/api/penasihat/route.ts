@@ -5,6 +5,7 @@ import {
   localPenasihat,
   originAllowed,
   parsePenasihatReply,
+  penasihatHeaders,
   penasihatPrompt,
   penasihatStage,
   tooManyNotes,
@@ -14,12 +15,7 @@ export const maxDuration = 60
 export const runtime = 'nodejs'
 
 function corsHeaders(origin: string | null) {
-  return {
-    'Access-Control-Allow-Origin': origin && originAllowed(origin) ? origin : 'https://beshareaisolution.com',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    Vary: 'Origin',
-  }
+  return penasihatHeaders(origin)
 }
 
 function clientKey(req: Request) {

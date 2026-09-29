@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  audioPayload,
   clipTurns,
   localPenasihat,
   originAllowed,
   parsePenasihatReply,
+  parseTranscript,
   penasihatPrompt,
+  penasihatSpoken,
   penasihatStage,
   tooManyNotes,
+  transcribePrompt,
 } from '../src/lib/penasihat.ts'
 
 test('penasihat terima peringkat dan asal portal', () => {
@@ -53,6 +57,24 @@ test('sandaran tempatan sebut perniagaan dan tiga langkah', () => {
   assert.match(reply.jawapan, /orang yang berkelayakan/)
   assert.equal(reply.langkah.length, 3)
   assert.equal(clipTurns([{ dari: 'klien', teks: '  hello  ' }, { dari: 'lain', teks: 'x' }]).length, 1)
+})
+
+test('suara penasihat baca jawapan dan tiga langkah', () => {
+  const prompt = transcribePrompt()
+  assert.match(prompt, /Bahasa Malaysia/)
+  assert.match(prompt, /Jangan jawab soalan itu/)
+  assert.equal(parseTranscript('Transkrip: "Macam mana nak naikkan jualan?"'), 'Macam mana nak naikkan jualan?')
+  assert.equal(parseTranscript('kosong'), '')
+  const spoken = penasihatSpoken('Fokus pada pelanggan lama.', ['Hubungi lima orang.', 'Tulis satu tawaran.', 'Catat pertanyaan.'])
+  assert.match(spoken, /Fokus pada pelanggan lama/)
+  assert.match(spoken, /Satu\. Hubungi lima orang/)
+  assert.match(spoken, /Dua\. Tulis satu tawaran/)
+  assert.match(spoken, /Tiga\. Catat pertanyaan/)
+  assert.equal(spoken.includes('Baca dalam loghat'), false)
+  assert.equal(audioPayload('abc', 'audio/webm'), null)
+  assert.equal(audioPayload('A'.repeat(120), 'text/plain'), null)
+  const sah = audioPayload(`${'A'.repeat(120)}==`, 'audio/webm;codecs=opus')
+  assert.equal(sah?.mime, 'audio/webm')
 })
 
 test('had mesej penasihat', () => {
