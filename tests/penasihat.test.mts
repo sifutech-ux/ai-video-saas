@@ -27,6 +27,8 @@ test('arahan penasihat kekal Bahasa Malaysia dan tiga langkah', () => {
   })
   assert.match(prompt, /Bahasa Malaysia/)
   assert.match(prompt, /bukan loghat atau perkataan Indonesia/)
+  assert.match(prompt, /Panggil klien "awak"/)
+  assert.match(prompt, /Jangan reka harga, diskaun/)
   assert.match(prompt, /SSM/)
   assert.match(prompt, /Lemon S/)
   assert.match(prompt, /Sudah jual/)
