@@ -133,7 +133,7 @@ Hasilkan SATU objek JSON sahaja untuk produk ini:
 
 ${BEATS[input.direction]}
 
-Bahasa skrip: Melayu, ayat pendek, seperti bercakap pada kamera.
+Bahasa skrip: Bahasa Malaysia seperti percakapan di Malaysia, bukan loghat atau perkataan Indonesia. Ayat pendek, seperti bercakap pada kamera.
 Tepat 2 adegan sahaja: avatar, kemudian b-roll.
 Penyampai memegang pek produk. Skrip penyampai paling banyak 2 ayat dan bawah 32 patah perkataan, mesti habis disebut.
 Skrip produk 1 ayat dan bawah 14 patah perkataan, mesti habis disebut.
