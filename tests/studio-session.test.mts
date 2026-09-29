@@ -10,7 +10,7 @@ import {
 } from '../src/lib/studio-session.ts'
 import { allowedMediaUrl } from '../src/lib/media-url.ts'
 import { ensureStyle, fallbackPrompt } from '../src/lib/studio-prompt.ts'
-import { TTS_MODELS, geminiVoiceName, pcmToWav, presenterVoice, speechChunks, speechDirection, speechScript } from '../src/lib/malay-voice.ts'
+import { TTS_MODELS, geminiVoiceName, malaySpeechConfig, pcmToWav, presenterVoice, speechChunks, speechDirection, speechScript, SPEECH_LANGUAGE } from '../src/lib/malay-voice.ts'
 import { dressStoryboard, fitSpokenLine, localAd, oneAd, placePrompt, PRESENTER_WORDS, scriptPrompt, ugcDirection, withDirectionLook } from '../src/lib/ugc-direction.ts'
 import { sceneOutputUrl, SCENE_MISS, SCENE_MODEL, restageImage, createAvatarStill, holdProduct, HOLD_MISS, HOLD_MODEL, AVATAR_STILL_MISS, AVATAR_STILL_MODEL } from '../src/lib/restage-image.ts'
 import { framePadSeconds, publicStitchError, resolveFfmpeg } from '../src/lib/ugc-stitch.ts'
@@ -129,8 +129,12 @@ test('suara lalai lelaki dan gerakan avatar licin', () => {
   assert.equal(presenterVoice('perempuan'), 'perempuan')
   assert.equal(presenterVoice('lain'), 'lelaki')
   assert.equal(geminiVoiceName('lelaki'), 'Charon')
-  assert.equal(geminiVoiceName('perempuan'), 'Kore')
+  assert.equal(SPEECH_LANGUAGE, 'ms-MY')
+  assert.equal(malaySpeechConfig('lelaki').languageCode, 'ms-MY')
+  assert.equal(malaySpeechConfig('lelaki').voiceConfig.prebuiltVoiceConfig.voiceName, 'Charon')
   assert.match(speechDirection('Minum ini.', 'lelaki'), /lelaki dewasa/)
+  assert.match(speechDirection('Minum ini.', 'lelaki'), /bukan Indonesia/)
+  assert.equal(geminiVoiceName('perempuan'), 'Kore')
   assert.equal(TTS_MODELS[0], 'gemini-3.8-flash-lite-tts')
   assert.equal(TTS_MODELS.includes('gemini-2.5-flash-preview-tts' as never), false)
   assert.equal(speechScript('Minum ini.', 'lelaki', 'gemini-3.8-flash-lite-tts'), 'Minum ini.')
@@ -154,6 +158,8 @@ test('arah iklan menukar skrip dan klip produk', () => {
   })
   assert.match(live, /Live Selling/)
   assert.match(live, /beli sekarang/)
+  assert.match(live, /Bahasa Malaysia/)
+  assert.match(live, /bukan loghat atau perkataan Indonesia/)
   const beauty = scriptPrompt({
     productName: 'Krim',
     productBenefits: 'lembut',

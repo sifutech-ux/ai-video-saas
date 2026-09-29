@@ -12,12 +12,21 @@ export function geminiVoiceName(voice: PresenterVoice) {
   return voice === 'perempuan' ? 'Kore' : 'Charon'
 }
 
+export const SPEECH_LANGUAGE = 'ms-MY'
+
+export function malaySpeechConfig(voice: PresenterVoice) {
+  return {
+    languageCode: SPEECH_LANGUAGE,
+    voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiVoiceName(voice) } },
+  }
+}
+
 export function speechDirection(text: string, voice: PresenterVoice) {
   const tone =
     voice === 'perempuan'
       ? 'suara perempuan dewasa, nada tenang dan mesra'
       : 'suara lelaki dewasa, nada tenang dan mesra'
-  return `Baca iklan ini dalam Bahasa Malaysia, ${tone}, sebutan jelas: ${text}`
+  return `Baca dalam loghat Malaysia, bukan Indonesia, ${tone}, sebutan jelas: ${text}`
 }
 
 export function speechScript(text: string, voice: PresenterVoice, model: string) {
@@ -79,35 +88,46 @@ export type SpokenAudio = {
   mime: 'audio/wav' | 'audio/mpeg'
 }
 
+function languageRejected(error: unknown) {
+  const text = error instanceof Error ? error.message : ''
+  return /language code|unsupported language|LANGUAGE/i.test(text)
+}
+
 async function geminiSpeech(text: string, voice: PresenterVoice): Promise<SpokenAudio | null> {
   const key = process.env.GEMINI_API_KEY
   if (!key) return null
   const ai = new GoogleGenAI({ apiKey: key })
 
   for (const model of TTS_MODELS) {
-    try {
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model,
-          contents: speechScript(text, voice, model),
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiVoiceName(voice) } },
+    const languages = [SPEECH_LANGUAGE, '']
+    for (const languageCode of languages) {
+      try {
+        const speechConfig = languageCode
+          ? malaySpeechConfig(voice)
+          : { voiceConfig: malaySpeechConfig(voice).voiceConfig }
+        const response = await Promise.race([
+          ai.models.generateContent({
+            model,
+            contents: speechScript(text, voice, model),
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig,
             },
-          },
-        }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), 12000)),
-      ])
-      const part = response.candidates?.[0]?.content?.parts?.find((item) => item.inlineData?.data)
-      const raw = part?.inlineData?.data
-      if (!raw) continue
-      const bytes = Buffer.from(raw, 'base64')
-      if (bytes.length < 1000) continue
-      if (bytes.subarray(0, 4).toString() === 'RIFF') return { buffer: bytes, mime: 'audio/wav' }
-      return { buffer: pcmToWav(bytes), mime: 'audio/wav' }
-    } catch (error) {
-      console.warn(`Suara ${model} tidak digunakan.`, error instanceof Error ? error.message : error)
+          }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('masa tamat')), 12000)),
+        ])
+        const part = response.candidates?.[0]?.content?.parts?.find((item) => item.inlineData?.data)
+        const raw = part?.inlineData?.data
+        if (!raw) break
+        const bytes = Buffer.from(raw, 'base64')
+        if (bytes.length < 1000) break
+        if (bytes.subarray(0, 4).toString() === 'RIFF') return { buffer: bytes, mime: 'audio/wav' }
+        return { buffer: pcmToWav(bytes), mime: 'audio/wav' }
+      } catch (error) {
+        console.warn(`Suara ${model} tidak digunakan.`, error instanceof Error ? error.message : error)
+        if (languageCode && languageRejected(error)) continue
+        break
+      }
     }
   }
   return null
