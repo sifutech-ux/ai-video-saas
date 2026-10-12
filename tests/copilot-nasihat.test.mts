@@ -67,7 +67,7 @@ function asas(over: Partial<Parameters<typeof adviseCopilot>[0]> = {}) {
 
 test('cors copilot membenarkan bearer dan menolak hos lain', () => {
   const headers = copilotHeaders(ASAL)
-  assert.equal(headers['Access-Control-Allow-Headers'], 'Content-Type, Authorization')
+  assert.equal(headers['Access-Control-Allow-Headers'], 'Content-Type, Authorization, Idempotency-Key')
   assert.equal(headers['Access-Control-Allow-Origin'], ASAL)
   assert.equal(copilotHeaders('https://evil.example')['Access-Control-Allow-Origin'], ASAL)
   assert.equal(copilotSessionUrl(AKAUN), `${AKAUN}/api/akaun/copilot/sesi`)

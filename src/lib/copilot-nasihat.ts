@@ -34,7 +34,7 @@ export function copilotHeaders(origin: string | null) {
   return {
     'Access-Control-Allow-Origin': origin && originAllowed(origin) ? origin : 'https://beshareaisolution.com',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Idempotency-Key',
     'Cache-Control': 'no-store',
     Vary: 'Origin',
   }

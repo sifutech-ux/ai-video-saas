@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { POST } from '../src/app/api/copilot/nasihat/route.ts'
+import { OPTIONS, POST } from '../src/app/api/copilot/nasihat/route.ts'
 import { copilotSignature } from '../src/lib/copilot-kuta.ts'
 import { copilotRuntime } from '../src/lib/copilot-model.ts'
 
@@ -200,6 +200,21 @@ test('simpanan gagal selepas model tidak mengulang dan tidak memulangkan jawapan
     copilotRuntime.generate = original
     restore(previous)
   }
+})
+
+test('preflight nasihat membenarkan idempotency-key', async () => {
+  const response = await OPTIONS(new Request('https://beshareaisolution.com/api/copilot/nasihat', {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'https://beshareaisolution.com',
+      'access-control-request-method': 'POST',
+      'access-control-request-headers': 'content-type, authorization, idempotency-key',
+    },
+  }))
+  assert.equal(response.status, 204)
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://beshareaisolution.com')
+  assert.match(response.headers.get('access-control-allow-headers') || '', /Idempotency-Key/)
+  assert.match(response.headers.get('access-control-allow-methods') || '', /POST/)
 })
 
 function restore(previous: { akaun?: string; kuta?: string; kunci?: string; studio?: string }) {
