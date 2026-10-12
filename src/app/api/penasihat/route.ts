@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { askGemini, geminiKey } from '@/lib/gemini-text'
+import { createKuotaClient } from '@/lib/copilot-kuta'
+import { askPublicOnce } from '@/lib/copilot-model'
+import { advisePublicQuota } from '@/lib/penasihat-kuota'
 import {
   clipTurns,
   localPenasihat,
@@ -9,6 +12,8 @@ import {
   penasihatPrompt,
   penasihatStage,
   tooManyNotes,
+  type PenasihatStage,
+  type PenasihatTurn,
 } from '@/lib/penasihat'
 
 export const maxDuration = 60
@@ -58,6 +63,16 @@ export async function POST(req: Request) {
   }
 
   const soalan = { nama, jualan, peringkat, giliran }
+  if (process.env.PENASIHAT_KUOTA === 'on') {
+    return postDenganKuota(soalan, headers)
+  }
+  return jawapanSediaAda(soalan, headers)
+}
+
+async function jawapanSediaAda(
+  soalan: { nama: string; jualan: string; peringkat: PenasihatStage; giliran: PenasihatTurn[] },
+  headers: HeadersInit,
+) {
   try {
     if (!geminiKey()) throw new Error('tiada kunci')
     const text = await askGemini(penasihatPrompt(soalan), { json: true, timeoutMs: 22000 })
@@ -67,4 +82,22 @@ export async function POST(req: Request) {
     console.warn('Penasihat sandaran digunakan.', error instanceof Error ? error.message : error)
     return NextResponse.json({ ok: true, ...localPenasihat(soalan) }, { headers })
   }
+}
+
+async function postDenganKuota(
+  soalan: { nama: string; jualan: string; peringkat: PenasihatStage; giliran: PenasihatTurn[] },
+  headers: HeadersInit,
+) {
+  if (!geminiKey()) {
+    return NextResponse.json({ ok: true, ...localPenasihat(soalan) }, { headers })
+  }
+  const result = await advisePublicQuota({
+    soalan,
+    kuota: createKuotaClient({
+      akaunUrl: process.env.COPILOT_AKAUN_URL,
+      secret: process.env.COPILOT_KUTA_SECRET,
+    }),
+    ask: (prompt) => askPublicOnce(prompt),
+  })
+  return NextResponse.json(result.body, { status: result.status, headers })
 }

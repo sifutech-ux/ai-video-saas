@@ -1,3 +1,4 @@
+import { accountEndpoint, mapKuotaFailure, type KuotaClient } from './copilot-kuta'
 import {
   clipTurns,
   localPenasihat,
@@ -39,21 +40,8 @@ export function copilotHeaders(origin: string | null) {
   }
 }
 
-export function copilotSessionUrl(akaunUrl: string) {
-  let url: URL
-  try {
-    url = new URL(akaunUrl)
-  } catch {
-    return null
-  }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
-  if (!url.hostname) return null
-  url.pathname = '/api/akaun/copilot/sesi'
-  url.search = ''
-  url.hash = ''
-  url.username = ''
-  url.password = ''
-  return url.toString()
+export function copilotSessionUrl(akaunUrl: string, options?: { testLoopback?: boolean }) {
+  return accountEndpoint(akaunUrl, '/api/akaun/copilot/sesi', options?.testLoopback === true)
 }
 
 function accountId(value: unknown) {
@@ -147,15 +135,42 @@ function geminiBody(reply: PenasihatReply) {
   }
 }
 
+const IDEM_RE = /^[A-Za-z0-9_-]{16,64}$/
+
+type ModelOnce = {
+  text: string
+  model: string | null
+  promptTokens: number | null
+  outputTokens: number | null
+}
+
+function hasilRalat(error: unknown) {
+  if (error && typeof error === 'object' && 'kind' in error && (error as { kind?: string }).kind === 'uncertain') {
+    return 'uncertain' as const
+  }
+  return 'provider_failed' as const
+}
+
+async function simpan(kuota: KuotaClient, input: Parameters<KuotaClient['muktamad']>[0]) {
+  let last = await kuota.muktamad(input)
+  for (let n = 0; n < 2 && !last.ok && last.status >= 500; n += 1) {
+    last = await kuota.muktamad(input)
+  }
+  return last
+}
+
 export async function adviseCopilot(input: {
   origin: string | null
   authorization: string | null
   body: unknown
   rateKey: string
   akaunUrl: string | null | undefined
+  idempotencyKey: string | null
+  copilotKeyPresent: () => boolean
   now?: number
   introspect: (akaunUrl: string, authorization: string) => Promise<CopilotSession>
-  ask: (prompt: string) => Promise<string>
+  kuota: KuotaClient
+  ask: (prompt: string) => Promise<ModelOnce>
 }) {
   if (!originAllowed(input.origin)) {
     return { status: 403, body: errorBody('Permintaan ini tidak diterima.') }
@@ -190,17 +205,56 @@ export async function adviseCopilot(input: {
   if (giliran.at(-1)?.dari !== 'klien') {
     return { status: 400, body: errorBody('Sila tulis mesej.') }
   }
+  if (!input.idempotencyKey || !IDEM_RE.test(input.idempotencyKey)) {
+    return { status: 400, body: errorBody('Permintaan tidak sah.') }
+  }
+  if (!input.copilotKeyPresent()) {
+    return { status: 503, body: errorBody('Nasihat tidak sedia. Cuba semula.') }
+  }
 
   const soalan = { ...session.penasihat, giliran }
-  let text = ''
-  try {
-    text = await input.ask(penasihatPrompt(soalan))
-  } catch {
-    return { status: 502, body: tempatan('model_gagal', soalan) }
+  const reserved = await input.kuota.rezab({
+    route: 'copilot_nasihat',
+    idempotencyKey: input.idempotencyKey,
+    giliran,
+  })
+  if (!reserved.ok) {
+    const mapped = mapKuotaFailure(reserved.status, reserved.ralat)
+    return { status: mapped.status, body: errorBody(mapped.error) }
   }
+  if (reserved.status === 'settled') {
+    return { status: 200, body: { ...geminiBody(reserved.reply), main_semula: true } }
+  }
+  const sending = await input.kuota.hantar(reserved.rezabId)
+  if (!sending.ok) {
+    const mapped = mapKuotaFailure(sending.status, sending.ralat)
+    return { status: mapped.status, body: errorBody(mapped.error) }
+  }
+
   try {
-    return { status: 200, body: geminiBody(parsePenasihatReply(text)) }
-  } catch {
-    return { status: 502, body: tempatan('output_tidak_sah', soalan) }
+    const attempt = await input.ask(penasihatPrompt(soalan))
+    let reply: PenasihatReply
+    try {
+      reply = parsePenasihatReply(attempt.text)
+    } catch {
+      await simpan(input.kuota, { rezabId: reserved.rezabId, hasil: 'provider_failed' })
+      return { status: 502, body: tempatan('output_tidak_sah', soalan) }
+    }
+    const settled = await simpan(input.kuota, {
+      rezabId: reserved.rezabId,
+      hasil: 'settled',
+      jawapan: reply.jawapan,
+      langkah: reply.langkah,
+      model: attempt.model,
+      promptTokens: attempt.promptTokens,
+      outputTokens: attempt.outputTokens,
+    })
+    if (!settled.ok) {
+      return { status: 503, body: errorBody('Keputusan permintaan ini belum pasti.') }
+    }
+    return { status: 200, body: geminiBody(reply) }
+  } catch (error) {
+    await simpan(input.kuota, { rezabId: reserved.rezabId, hasil: hasilRalat(error) })
+    return { status: 502, body: tempatan('model_gagal', soalan) }
   }
 }
