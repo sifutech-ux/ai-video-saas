@@ -112,6 +112,9 @@ export function mapKuotaFailure(status: number, ralat: string) {
   if (ralat === 'tidak_pasti' || ralat === 'simpanan_tidak_pasti') {
     return { status: 503, error: 'Keputusan permintaan ini belum pasti.' }
   }
+  if (ralat === 'litar') {
+    return { status: 503, error: 'Nasihat ditutup sebentar.' }
+  }
   return { status: 503, error: 'Akaun tidak dapat dihubungi. Cuba semula.' }
 }
 

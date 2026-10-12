@@ -78,8 +78,9 @@ export async function fetchCopilotSession(
   authorization: string,
   fetchImpl: typeof fetch = globalThis.fetch,
   nowMs = Date.now(),
+  testLoopback = false,
 ): Promise<CopilotSession> {
-  const endpoint = copilotSessionUrl(akaunUrl)
+  const endpoint = copilotSessionUrl(akaunUrl, { testLoopback })
   if (!endpoint) return { ok: false, status: 503 }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 5_000)
@@ -168,6 +169,8 @@ export async function adviseCopilot(input: {
   idempotencyKey: string | null
   copilotKeyPresent: () => boolean
   now?: number
+  /** Gelung tempatan untuk ujian sahaja. Laluan HTTP produksi tidak menghidupkannya. */
+  testLoopback?: boolean
   introspect: (akaunUrl: string, authorization: string) => Promise<CopilotSession>
   kuota: KuotaClient
   ask: (prompt: string) => Promise<ModelOnce>
@@ -181,7 +184,7 @@ export async function adviseCopilot(input: {
   const authorization = bearer(input.authorization)
   if (!authorization) return { status: 401, body: errorBody('Sila masuk akaun dahulu.') }
   const akaunUrl = input.akaunUrl?.trim()
-  if (!akaunUrl || !copilotSessionUrl(akaunUrl)) {
+  if (!akaunUrl || !copilotSessionUrl(akaunUrl, { testLoopback: input.testLoopback === true })) {
     return { status: 503, body: errorBody('Akaun tidak dapat disahkan. Cuba semula.') }
   }
 

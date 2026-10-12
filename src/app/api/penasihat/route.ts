@@ -44,6 +44,17 @@ export async function POST(req: Request) {
       { status: 429, headers },
     )
   }
+  // PENASIHAT_AWAM_TUTUP: perlindungan MATI kecuali nilai tepat "on".
+  // Mati: POST /api/penasihat kekal, termasuk PENASIHAT_KUOTA. Jangan tetapkan dalam produksi.
+  // Hidup: panggilan awam ditolak di sini, sebelum Gemini dan sebelum kuota.
+  // Gulung balik: buang pemboleh ubah, atau tetapkan apa-apa nilai selain "on".
+  // Laluan suara dan POST /api/copilot/nasihat tidak menggunakan suis ini.
+  if (process.env.PENASIHAT_AWAM_TUTUP === 'on') {
+    return NextResponse.json(
+      { error: 'Nasihat awam ditutup. Guna meja akaun.' },
+      { status: 403, headers },
+    )
+  }
 
   let body: unknown
   try {
