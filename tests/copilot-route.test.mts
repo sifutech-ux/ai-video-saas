@@ -4,7 +4,7 @@ import { OPTIONS, POST } from '../src/app/api/copilot/nasihat/route.ts'
 import { copilotSignature } from '../src/lib/copilot-kuta.ts'
 import { copilotRuntime } from '../src/lib/copilot-model.ts'
 
-const AKAUN = 'https://beshare-ipo-bot.onrender.com'
+const AKAUN = 'https://akaun.beshareaisolution.com'
 const MODEL = '{"jawapan":"Tulis satu ayat tawaran.","langkah":["Senaraikan sepuluh orang.","Mesej tiga orang.","Tetapkan cara bayar."]}'
 const KUNCI = 'idem-copilot-http-01'
 
@@ -43,11 +43,13 @@ test('laluan http copilot memanggil model sekali selepas kuota', async () => {
   const previousFetch = globalThis.fetch
   const previous = {
     akaun: process.env.COPILOT_AKAUN_URL,
+    hos: process.env.COPILOT_AKAUN_HOST,
     kuta: process.env.COPILOT_KUTA_SECRET,
     kunci: process.env.COPILOT_GEMINI_API_KEY,
     studio: process.env.GEMINI_API_KEY,
   }
   process.env.COPILOT_AKAUN_URL = AKAUN
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
   process.env.COPILOT_KUTA_SECRET = 'kuta-ujian'
   process.env.COPILOT_GEMINI_API_KEY = 'ujian-bukan-panggilan'
   process.env.GEMINI_API_KEY = 'kunci-studio-bukan-panggilan'
@@ -103,11 +105,13 @@ test('laluan http gagal tertutup tanpa model bila kunci atau kuota tiada', async
   const previousFetch = globalThis.fetch
   const previous = {
     akaun: process.env.COPILOT_AKAUN_URL,
+    hos: process.env.COPILOT_AKAUN_HOST,
     kuta: process.env.COPILOT_KUTA_SECRET,
     kunci: process.env.COPILOT_GEMINI_API_KEY,
     studio: process.env.GEMINI_API_KEY,
   }
   process.env.COPILOT_AKAUN_URL = AKAUN
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
   process.env.COPILOT_KUTA_SECRET = 'kuta-ujian'
   process.env.GEMINI_API_KEY = 'kunci-studio-bukan-panggilan'
   delete process.env.COPILOT_GEMINI_API_KEY
@@ -161,11 +165,13 @@ test('simpanan gagal selepas model tidak mengulang dan tidak memulangkan jawapan
   const previousFetch = globalThis.fetch
   const previous = {
     akaun: process.env.COPILOT_AKAUN_URL,
+    hos: process.env.COPILOT_AKAUN_HOST,
     kuta: process.env.COPILOT_KUTA_SECRET,
     kunci: process.env.COPILOT_GEMINI_API_KEY,
     studio: process.env.GEMINI_API_KEY,
   }
   process.env.COPILOT_AKAUN_URL = AKAUN
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
   process.env.COPILOT_KUTA_SECRET = 'kuta-ujian'
   process.env.COPILOT_GEMINI_API_KEY = 'ujian-bukan-panggilan'
   delete process.env.GEMINI_API_KEY
@@ -217,8 +223,9 @@ test('preflight nasihat membenarkan idempotency-key', async () => {
   assert.match(response.headers.get('access-control-allow-methods') || '', /POST/)
 })
 
-function restore(previous: { akaun?: string; kuta?: string; kunci?: string; studio?: string }) {
+function restore(previous: { akaun?: string; hos?: string; kuta?: string; kunci?: string; studio?: string }) {
   assign('COPILOT_AKAUN_URL', previous.akaun)
+  assign('COPILOT_AKAUN_HOST', previous.hos)
   assign('COPILOT_KUTA_SECRET', previous.kuta)
   assign('COPILOT_GEMINI_API_KEY', previous.kunci)
   assign('GEMINI_API_KEY', previous.studio)

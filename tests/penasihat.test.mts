@@ -3,10 +3,12 @@ import test from 'node:test'
 import {
   audioPayload,
   clipTurns,
+  extraOrigins,
   localPenasihat,
   originAllowed,
   parsePenasihatReply,
   parseTranscript,
+  penasihatHeaders,
   penasihatPrompt,
   penasihatSpoken,
   penasihatStage,
@@ -20,6 +22,22 @@ test('penasihat terima peringkat dan asal portal', () => {
   assert.equal(originAllowed('https://beshareaisolution.com'), true)
   assert.equal(originAllowed('https://ai-video-saas-ten.vercel.app'), false)
   assert.equal(originAllowed(null), false)
+  assert.equal(originAllowed('*'), false)
+  const previous = process.env.PENASIHAT_EXTRA_ORIGINS
+  process.env.PENASIHAT_EXTRA_ORIGINS = 'https://staging.beshareaisolution.com'
+  try {
+    assert.equal(originAllowed('https://staging.beshareaisolution.com'), true)
+    assert.equal(originAllowed('https://beshareaisolution.com'), true)
+    process.env.PENASIHAT_EXTRA_ORIGINS = 'https://staging.beshareaisolution.com, *'
+    assert.equal(extraOrigins(), null)
+    assert.equal(originAllowed('https://staging.beshareaisolution.com'), false)
+    assert.equal(originAllowed('https://beshareaisolution.com'), true)
+    assert.equal(penasihatHeaders('https://evil.example')['Access-Control-Allow-Origin'], 'https://beshareaisolution.com')
+    assert.notEqual(penasihatHeaders('*')['Access-Control-Allow-Origin'], '*')
+  } finally {
+    if (previous === undefined) delete process.env.PENASIHAT_EXTRA_ORIGINS
+    else process.env.PENASIHAT_EXTRA_ORIGINS = previous
+  }
 })
 
 test('arahan penasihat kekal Bahasa Malaysia dan tiga langkah', () => {

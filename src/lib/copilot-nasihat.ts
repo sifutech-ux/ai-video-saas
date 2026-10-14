@@ -13,7 +13,7 @@ import {
 
 /**
  * Laluan Copilot yang dilindungi.
- * Pelayan nasihat hanya membaca COPILOT_AKAUN_URL.
+ * Pelayan nasihat membaca COPILOT_AKAUN_URL dan COPILOT_AKAUN_HOST.
  * Rahsia tandatangan akaun dan token bot Telegram tidak dibaca di sini.
  * Bearer yang dihantar semula ialah token sesi pengguna, bukan kelayakan perkhidmatan.
  */
