@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import test from 'node:test'
+import test, { after, before } from 'node:test'
 import { ModelAttemptError } from '../src/lib/copilot-model.ts'
 import {
   adviseCopilot,
@@ -12,7 +12,16 @@ import {
 import type { KuotaClient } from '../src/lib/copilot-kuta.ts'
 
 const ASAL = 'https://beshareaisolution.com'
-const AKAUN = 'https://beshare-ipo-bot.onrender.com'
+const AKAUN = 'https://akaun.beshareaisolution.com'
+let hosTerdahulu: string | undefined
+before(() => {
+  hosTerdahulu = process.env.COPILOT_AKAUN_HOST
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
+})
+after(() => {
+  if (hosTerdahulu === undefined) delete process.env.COPILOT_AKAUN_HOST
+  else process.env.COPILOT_AKAUN_HOST = hosTerdahulu
+})
 const TOKEN = 'Bearer token-ujian-bukan-rahsia'
 const KONTEKS = {
   nama: 'Kedai Amanah',

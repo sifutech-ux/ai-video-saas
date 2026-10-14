@@ -126,7 +126,8 @@ test('bendera kuota hidup menempah sebelum model dan memulangkan 429', async () 
   const previous = save()
   process.env.PENASIHAT_KUOTA = 'on'
   process.env.GEMINI_API_KEY = 'ujian-bukan-panggilan'
-  process.env.COPILOT_AKAUN_URL = 'https://beshare-ipo-bot.onrender.com'
+  process.env.COPILOT_AKAUN_URL = 'https://akaun.beshareaisolution.com'
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
   process.env.COPILOT_KUTA_SECRET = 'kuta-ujian'
   delete process.env.COPILOT_GEMINI_API_KEY
   let model = 0
@@ -200,6 +201,7 @@ function save() {
     gemini: process.env.GEMINI_API_KEY,
     copilot: process.env.COPILOT_GEMINI_API_KEY,
     akaun: process.env.COPILOT_AKAUN_URL,
+    hos: process.env.COPILOT_AKAUN_HOST,
     kuta: process.env.COPILOT_KUTA_SECRET,
   }
 }
@@ -209,6 +211,7 @@ function restore(previous: ReturnType<typeof save>) {
   assign('GEMINI_API_KEY', previous.gemini)
   assign('COPILOT_GEMINI_API_KEY', previous.copilot)
   assign('COPILOT_AKAUN_URL', previous.akaun)
+  assign('COPILOT_AKAUN_HOST', previous.hos)
   assign('COPILOT_KUTA_SECRET', previous.kuta)
 }
 

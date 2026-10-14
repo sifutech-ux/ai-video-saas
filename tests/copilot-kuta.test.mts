@@ -14,22 +14,35 @@ test('tandatangan hmac sepadan dengan perkhidmatan akaun', () => {
 })
 
 test('hos produksi ditolak jika bukan https tepat', () => {
-  const host = 'https://beshare-ipo-bot.onrender.com'
-  assert.equal(accountEndpoint(host, '/api/akaun/copilot/sesi'), `${host}/api/akaun/copilot/sesi`)
-  for (const bad of [
-    'http://beshare-ipo-bot.onrender.com',
-    'https://beshare-ipo-bot.onrender.com:8443',
-    'https://user:rahsia@beshare-ipo-bot.onrender.com',
-    'https://beshare-ipo-bot.onrender.com/api',
-    'https://beshare-ipo-bot.onrender.com/?token=rahsia',
-    'https://10.1.2.3',
-    'https://192.168.1.9',
-    'https://172.16.0.4',
-    'http://localhost:8767',
-    'http://127.0.0.1:8767',
-    'https://akaun.example',
-  ]) {
-    assert.equal(accountEndpoint(bad, '/api/akaun/copilot/sesi'), null, bad)
+  const previous = process.env.COPILOT_AKAUN_HOST
+  const host = 'https://akaun.beshareaisolution.com'
+  delete process.env.COPILOT_AKAUN_HOST
+  assert.equal(accountEndpoint(host, '/api/akaun/copilot/sesi'), null)
+  process.env.COPILOT_AKAUN_HOST = 'beshare-ipo-bot.onrender.com'
+  assert.equal(accountEndpoint('https://beshare-ipo-bot.onrender.com', '/api/akaun/copilot/sesi'), null)
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
+  try {
+    assert.equal(accountEndpoint(host, '/api/akaun/copilot/sesi'), `${host}/api/akaun/copilot/sesi`)
+    for (const bad of [
+      'http://akaun.beshareaisolution.com',
+      'https://akaun.beshareaisolution.com:8443',
+      'https://user:rahsia@akaun.beshareaisolution.com',
+      'https://akaun.beshareaisolution.com/api',
+      'https://akaun.beshareaisolution.com/?token=rahsia',
+      'https://akaun.beshareaisolution.com/#frag',
+      'https://beshare-ipo-bot.onrender.com',
+      'https://10.1.2.3',
+      'https://192.168.1.9',
+      'https://172.16.0.4',
+      'http://localhost:8767',
+      'http://127.0.0.1:8767',
+      'https://akaun.example',
+    ]) {
+      assert.equal(accountEndpoint(bad, '/api/akaun/copilot/sesi'), null, bad)
+    }
+  } finally {
+    if (previous === undefined) delete process.env.COPILOT_AKAUN_HOST
+    else process.env.COPILOT_AKAUN_HOST = previous
   }
   const nodeEnv = process.env.NODE_ENV
   process.env.NODE_ENV = 'test'
@@ -49,10 +62,12 @@ test('hos produksi ditolak jika bukan https tepat', () => {
 })
 
 test('klien kuota menandatangani badan dan gagal tertutup', async () => {
+  const previous = process.env.COPILOT_AKAUN_HOST
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
   const masaDijangka = 1_700_000_000
   const calls: Array<{ url: string; redirect?: RequestRedirect; auth?: string; masa: string; nonce: string; sig: string; body: string }> = []
   const client = createKuotaClient({
-    akaunUrl: 'https://beshare-ipo-bot.onrender.com',
+    akaunUrl: 'https://akaun.beshareaisolution.com',
     secret: 'kuta-ujian',
     authorization: 'Bearer token-ujian',
     now: () => 1_700_000_000_000,
@@ -90,8 +105,9 @@ test('klien kuota menandatangani badan dan gagal tertutup', async () => {
   assert.equal(calls[0].body.includes('akaun_id'), false)
 
   const putus = createKuotaClient({
-    akaunUrl: 'http://beshare-ipo-bot.onrender.com',
+    akaunUrl: 'https://beshare-ipo-bot.onrender.com',
     secret: 'kuta-ujian',
+    authorization: 'Bearer jangan-hantar',
     fetchImpl: async () => {
       throw new Error('rangkaian tidak patut')
     },
@@ -103,6 +119,8 @@ test('klien kuota menandatangani badan dan gagal tertutup', async () => {
   })
   assert.equal(gagal.ok, false)
   assert.equal(gagal.status, 503)
+  if (previous === undefined) delete process.env.COPILOT_AKAUN_HOST
+  else process.env.COPILOT_AKAUN_HOST = previous
 })
 
 test('kunci copilot tidak jatuh ke kunci studio', async () => {

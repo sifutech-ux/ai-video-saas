@@ -1,7 +1,18 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 
-/** Hos akaun yang diluluskan untuk operasi produksi. */
-export const ACCOUNT_HOST = 'beshare-ipo-bot.onrender.com'
+/** Hos IPO tidak pernah menjadi destinasi akaun, walaupun ditetapkan secara tersurat. */
+const DENIED_ACCOUNT_HOST = 'beshare-ipo-bot.onrender.com'
+
+export function approvedAccountHost() {
+  const raw = process.env.COPILOT_AKAUN_HOST
+  if (typeof raw !== 'string') return null
+  const host = raw.trim()
+  if (!host || host !== host.toLowerCase()) return null
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(host)) return null
+  if (host === DENIED_ACCOUNT_HOST || host.endsWith('.beshare-ipo-bot.onrender.com')) return null
+  if (privateHost(host)) return null
+  return host
+}
 
 const REZAB = '/api/akaun/copilot/kuota/rezab'
 const HANTAR = '/api/akaun/copilot/kuota/hantar'
@@ -79,8 +90,10 @@ export function accountEndpoint(akaunUrl: string, path: string, testLoopback = f
     (host === '127.0.0.1' || host === 'localhost') &&
     url.protocol === 'http:'
   if (!loopback) {
+    const approved = approvedAccountHost()
+    if (!approved) return null
     if (url.protocol !== 'https:') return null
-    if (host !== ACCOUNT_HOST) return null
+    if (host !== approved || host === DENIED_ACCOUNT_HOST) return null
     if (url.port && url.port !== '443') return null
     if (privateHost(host)) return null
   }
