@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { existsSync, realpathSync } from 'node:fs'
+import { mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
-import test from 'node:test'
+import { describe, test } from 'node:test'
 import { promisify } from 'node:util'
 import { OPTIONS as copilotOptions } from '../src/app/api/copilot/nasihat/route.ts'
 import { OPTIONS as awamOptions, POST as awamPost } from '../src/app/api/penasihat/route.ts'
@@ -14,19 +15,55 @@ import { ModelAttemptError } from '../src/lib/copilot-model.ts'
 import { publicRuntime } from '../src/lib/copilot-model.ts'
 
 const exec = promisify(execFile)
-const IPO = '/agent/repos/beshare-ipo'
+const AKAUN_ENV = 'COPILOT_TEST_AKAUN_ROOT'
+const AKAUN_LALAI = '/tmp/akaun-kontrak'
+const KOTOR = '/agent/repos/beshare-ipo'
 const KUTA = 'kuta-ujian-gabungan'
 const RAHSIA = 'rahsia-ujian-gabungan'
+const BOT = 'token-bot-ujian-bukan-akaun'
 const MODEL = '{"jawapan":"Fokus pelanggan lama minggu ini.","langkah":["Hubungi lima orang.","Tulis satu tawaran.","Catat pertanyaan."]}'
 const GILIRAN = [{ dari: 'klien' as const, teks: 'Macam mana nak susun minggu ini?' }]
 const LAIN = [{ dari: 'klien' as const, teks: 'Soalan lain yang tidak sama.' }]
 
-const PELAYAN = `import json, os, sqlite3
+const PELAYAN = `import json, os, sqlite3, sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pelanggan_akaun as akaun
 
-DB = os.environ['COPILOT_DB']
-SECRET = os.environ['COPILOT_ACCOUNT_SECRET']
+def tolak(mesej):
+    raise SystemExit(mesej)
+
+akar = os.environ.get('COPILOT_TEST_AKAUN_ROOT', '')
+pangkal_db = os.environ.get('COPILOT_TEST_DB_ROOT', '')
+DB = os.environ.get('COPILOT_DB', '')
+kotor = '/agent/repos/beshare-ipo'
+if not akar.startswith('/') or '\\x00' in akar or any(segmen in ('.', '..') for segmen in akar.split('/')):
+    tolak('sasaran akaun kabur')
+if not os.path.isdir(akar) or os.path.realpath(akar) != akar:
+    tolak('sasaran akaun kabur')
+if akar == kotor or akar.startswith(kotor + '/'):
+    tolak('sasaran akaun kabur')
+if not pangkal_db.startswith('/') or '\\x00' in pangkal_db or not os.path.isdir(pangkal_db):
+    tolak('pangkalan ujian ditolak')
+if os.path.realpath(pangkal_db) != pangkal_db:
+    tolak('pangkalan ujian ditolak')
+if pangkal_db == akar or pangkal_db.startswith(akar + '/') or pangkal_db == kotor or pangkal_db.startswith(kotor + '/'):
+    tolak('pangkalan ujian ditolak')
+asal = os.path.realpath(os.path.dirname(DB))
+if os.path.basename(DB) != 'akaun.db' or asal != pangkal_db:
+    tolak('pangkalan ujian ditolak')
+if 'beshare_ipo.db' in DB or 'copilot_kuota' in DB:
+    tolak('pangkalan ujian ditolak')
+modul = os.path.realpath(akaun.__file__)
+if not modul.startswith(akar + '/') or kotor in modul:
+    tolak('modul akaun kabur')
+if os.path.realpath(os.getcwd()) != akar:
+    tolak('direktori kerja kabur')
+if any(kotor in item for item in sys.path):
+    tolak('laluan kotor')
+SECRET = akaun.account_secret()
+bot = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+if not SECRET or SECRET == bot:
+    raise SystemExit('rahsia akaun tidak terasing')
 
 def connect():
     return sqlite3.connect(DB, timeout=5)
@@ -59,9 +96,52 @@ class H(BaseHTTPRequestHandler):
         return
 
 server = ThreadingHTTPServer(('127.0.0.1', 0), H)
+print('MODUL ' + modul, flush=True)
+print('DB ' + DB, flush=True)
+print('CWD ' + os.path.realpath(os.getcwd()), flush=True)
 print(f'PORT {server.server_address[1]}', flush=True)
 server.serve_forever()
 `
+
+function akarDikonfigurasi() {
+  const diberi = process.env[AKAUN_ENV]
+  if (diberi === undefined) return AKAUN_LALAI
+  return diberi
+}
+
+function akaunKerja() {
+  const mentah = akarDikonfigurasi()
+  if (!mentah || mentah !== mentah.trim() || mentah.includes('\0') || !mentah.startsWith('/')) {
+    throw new Error('sasaran akaun kabur')
+  }
+  if (mentah.split('/').some((segmen) => segmen === '.' || segmen === '..')) {
+    throw new Error('sasaran akaun kabur')
+  }
+  if (resolve(mentah) !== mentah) throw new Error('sasaran akaun kabur')
+  const kotor = existsSync(KOTOR) ? realpathSync(KOTOR) : KOTOR
+  if (mentah === kotor || mentah.startsWith(`${kotor}/`)) throw new Error('sasaran akaun kabur')
+  if (!existsSync(mentah)) throw new Error('sasaran akaun tiada')
+  const real = realpathSync(mentah)
+  if (real !== mentah || real === kotor || real.startsWith(`${kotor}/`)) {
+    throw new Error('sasaran akaun kabur')
+  }
+  for (const name of ['pelanggan_akaun.py', 'pelanggan_kuota.py']) {
+    const fail = join(real, name)
+    if (!existsSync(fail)) throw new Error('modul akaun tiada')
+    const nyata = realpathSync(fail)
+    if (nyata !== fail || !nyata.startsWith(`${real}/`) || nyata.startsWith(`${kotor}/`) || nyata === kotor) {
+      throw new Error('modul akaun kabur')
+    }
+  }
+  return real
+}
+
+function ambil(input: RequestInfo | URL, init?: RequestInit) {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+  const host = new URL(url).hostname
+  if (host !== '127.0.0.1') throw new Error('panggilan bukan gelung tempatan')
+  return fetch(input, init)
+}
 
 type Hasil = { status: number; body: Record<string, unknown> }
 
@@ -110,6 +190,8 @@ test('bendera nasihat awam mati kekal dan hidup menolak sebelum Gemini', async (
     tutup: process.env.PENASIHAT_AWAM_TUTUP,
     kuota: process.env.PENASIHAT_KUOTA,
     gemini: process.env.GEMINI_API_KEY,
+    copilot: process.env.COPILOT_GEMINI_API_KEY,
+    akaun: process.env.COPILOT_AKAUN_URL,
   }
   const original = publicRuntime.generate
   let model = 0
@@ -120,6 +202,8 @@ test('bendera nasihat awam mati kekal dan hidup menolak sebelum Gemini', async (
   delete process.env.PENASIHAT_AWAM_TUTUP
   delete process.env.PENASIHAT_KUOTA
   delete process.env.GEMINI_API_KEY
+  delete process.env.COPILOT_GEMINI_API_KEY
+  delete process.env.COPILOT_AKAUN_URL
   try {
     const mati = await awamPost(permintaanAwam('203.0.113.80'))
     const badanMati = await mati.json()
@@ -165,44 +249,127 @@ test('bendera nasihat awam mati kekal dan hidup menolak sebelum Gemini', async (
     assign('PENASIHAT_AWAM_TUTUP', previous.tutup)
     assign('PENASIHAT_KUOTA', previous.kuota)
     assign('GEMINI_API_KEY', previous.gemini)
+    assign('COPILOT_GEMINI_API_KEY', previous.copilot)
+    assign('COPILOT_AKAUN_URL', previous.akaun)
   }
 })
 
-test('akaun kuota dan nasihat tempatan bersama dengan Gemini palsu', async () => {
+describe('akar akaun ujian', { concurrency: false }, () => {
+  test('akar kabur, tiada, pautan, atau checkout kotor ditolak', async () => {
+    const sebelumnya = process.env[AKAUN_ENV]
+    const pangkal = await realpath(tmpdir())
+    const pautanKotor = join(pangkal, 'akaun-pautan-kotor-cd0e')
+    const nyata = await mkdtemp(join(pangkal, 'akaun-nyata-'))
+    const pautanSah = join(pangkal, 'akaun-pautan-sah-cd0e')
+    await rm(pautanKotor, { force: true })
+    await rm(pautanSah, { force: true })
+    const kosong = await mkdtemp(join(pangkal, 'akaun-kosong-'))
+    const kes = [
+      '',
+      'akaun-kontrak',
+      '/tmp/./akaun-kontrak',
+      '/tmp/akaun-kontrak/../akaun-kontrak',
+      '/tmp/akaun-tiada-cd0e-tidak-wujud',
+      `  ${AKAUN_LALAI}`,
+      KOTOR,
+      `${KOTOR}/pelanggan_akaun.py`,
+    ]
+    try {
+      for (const nilai of kes) {
+        process.env[AKAUN_ENV] = nilai
+        assert.throws(() => akaunKerja(), /sasaran akaun/)
+      }
+      assert.throws(() => {
+        process.env[AKAUN_ENV] = '/tmp/akaun\0kontrak'
+        akaunKerja()
+      })
+      if (existsSync(KOTOR)) {
+        await symlink(KOTOR, pautanKotor)
+        process.env[AKAUN_ENV] = pautanKotor
+        assert.throws(() => akaunKerja(), /sasaran akaun/)
+      }
+      await symlink(nyata, pautanSah)
+      process.env[AKAUN_ENV] = pautanSah
+      assert.throws(() => akaunKerja(), /sasaran akaun/)
+      process.env[AKAUN_ENV] = kosong
+      assert.throws(() => akaunKerja(), /modul akaun tiada/)
+      delete process.env[AKAUN_ENV]
+      if (existsSync(AKAUN_LALAI)) {
+        assert.equal(akaunKerja(), AKAUN_LALAI)
+        process.env[AKAUN_ENV] = AKAUN_LALAI
+        assert.equal(akaunKerja(), AKAUN_LALAI)
+      } else {
+        assert.throws(() => akaunKerja(), /sasaran akaun/)
+      }
+    } finally {
+      assign(AKAUN_ENV, sebelumnya)
+      await rm(pautanKotor, { force: true })
+      await rm(pautanSah, { force: true })
+      await rm(nyata, { recursive: true, force: true })
+      await rm(kosong, { recursive: true, force: true })
+    }
+  })
+
+  test('akaun kuota dan nasihat tempatan bersama dengan Gemini palsu', async () => {
   const previousNode = process.env.NODE_ENV
-  const previousKuta = process.env.COPILOT_KUTA_SECRET
+  const dikonfigurasi = process.env[AKAUN_ENV]
+  const akar = akaunKerja()
+  if (dikonfigurasi === undefined) assert.equal(akar, AKAUN_LALAI)
+  else assert.equal(akar, dikonfigurasi)
+  if (RAHSIA === BOT) throw new Error('rahsia akaun tidak terasing')
   process.env.NODE_ENV = 'test'
-  process.env.COPILOT_KUTA_SECRET = KUTA
-  const dir = await mkdtemp(join(tmpdir(), 'copilot-gabungan-'))
+  const pangkal = await realpath(tmpdir())
+  const dir = await mkdtemp(join(pangkal, 'copilot-gabungan-'))
   const db = join(dir, 'akaun.db')
+  if (!db.startsWith(`${pangkal}/`) || db.includes('beshare_ipo.db') || db.includes('copilot_kuota')) {
+    throw new Error('pangkalan ujian ditolak')
+  }
   const skrip = join(dir, 'pelayan.py')
   await writeFile(skrip, PELAYAN)
   const child = spawn('python3', [skrip], {
-    cwd: IPO,
+    cwd: akar,
     env: {
-      ...process.env,
-      PYTHONPATH: IPO,
+      PATH: process.env.PATH || '/usr/bin',
+      HOME: process.env.HOME || '/tmp',
+      LANG: 'C.UTF-8',
+      PYTHONNOUSERSITE: '1',
+      PYTHONPATH: akar,
+      COPILOT_TEST_AKAUN_ROOT: akar,
+      COPILOT_TEST_DB_ROOT: dir,
       COPILOT_DB: db,
       COPILOT_KUTA_SECRET: KUTA,
-      COPILOT_ACCOUNT_SECRET: RAHSIA,
+      AKAUN_SECRET: RAHSIA,
+      TELEGRAM_BOT_TOKEN: BOT,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let log = ''
+  let keluar = ''
+  const senyap = (teks: string) => teks.replaceAll(RAHSIA, '[rahsia]').replaceAll(BOT, '[bot]').replaceAll(KUTA, '[kuta]')
   child.stderr?.on('data', (chunk) => { log += chunk.toString() })
-  const port = await new Promise<number>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`pelayan tidak bangun ${log}`)), 8000)
+  const port = await new Promise<number>((resolvePort, reject) => {
+    const timer = setTimeout(() => reject(new Error(`pelayan tidak bangun ${senyap(log)}`)), 8000)
+    const onExit = (code: number | null) => {
+      clearTimeout(timer)
+      reject(new Error(`pelayan keluar ${code} ${senyap(log)}`))
+    }
+    child.once('exit', onExit)
     child.stdout?.on('data', (chunk) => {
-      const match = /PORT (\d+)/.exec(chunk.toString())
+      keluar += chunk.toString()
+      const match = /PORT (\d+)/.exec(keluar)
       if (!match) return
       clearTimeout(timer)
-      resolve(Number(match[1]))
-    })
-    child.once('exit', (code) => {
-      clearTimeout(timer)
-      reject(new Error(`pelayan keluar ${code} ${log}`))
+      child.off('exit', onExit)
+      resolvePort(Number(match[1]))
     })
   })
+  const modul = /^MODUL (.+)$/m.exec(keluar)?.[1] || ''
+  const pangkalan = /^DB (.+)$/m.exec(keluar)?.[1] || ''
+  const cwd = /^CWD (.+)$/m.exec(keluar)?.[1] || ''
+  assert.equal(modul.startsWith(`${akar}/`), true)
+  assert.equal(modul.includes(KOTOR), false)
+  assert.equal(cwd, akar)
+  assert.equal(pangkalan, db)
   const asal = `http://127.0.0.1:${port}`
   let model = 0
   const panggilan = { rezab: 0 }
@@ -212,6 +379,7 @@ test('akaun kuota dan nasihat tempatan bersama dengan Gemini palsu', async () =>
       akaunUrl: asal,
       secret: KUTA,
       authorization: `Bearer ${token}`,
+      fetchImpl: ambil,
       testLoopback: true,
     })
     return {
@@ -237,7 +405,7 @@ test('akaun kuota dan nasihat tempatan bersama dengan Gemini palsu', async () =>
       idempotencyKey: kunci,
       copilotKeyPresent: () => true,
       testLoopback: true,
-      introspect: (url, authorization) => fetchCopilotSession(url, authorization, globalThis.fetch, Date.now(), true),
+      introspect: (url, authorization) => fetchCopilotSession(url, authorization, ambil, Date.now(), true),
       kuota: kuota(token),
       ask,
     })
@@ -245,7 +413,7 @@ test('akaun kuota dan nasihat tempatan bersama dengan Gemini palsu', async () =>
   }
 
   async function http(path: string, token: string, badan?: unknown) {
-    const balas = await fetch(`${asal}${path}`, {
+    const balas = await ambil(`${asal}${path}`, {
       method: badan === undefined ? 'GET' : 'POST',
       headers: {
         Accept: 'application/json',
@@ -431,9 +599,9 @@ test('akaun kuota dan nasihat tempatan bersama dengan Gemini palsu', async () =>
     })
     if (previousNode === undefined) delete process.env.NODE_ENV
     else process.env.NODE_ENV = previousNode
-    assign('COPILOT_KUTA_SECRET', previousKuta)
     await rm(dir, { recursive: true, force: true })
   }
+  })
 })
 
 function assign(name: string, value: string | undefined) {
