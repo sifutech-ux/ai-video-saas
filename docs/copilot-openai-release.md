@@ -22,7 +22,21 @@ Base: deployed advice commit `0598dc836be082b87e8ab52565946b9ee4722b0f`, not the
 
 ## Deployment and rollback
 
-The user authorized the existing OpenAI key and Copilot activation. **Not deployed yet.**
+The user authorized the existing OpenAI key and Copilot activation. **Deployed and verified on 13 November 2026 (Malaysia time).**
+
+- Backend image: `copilot-advice:978966eafb1e91a5ea3b066bc16b66ac064fa420`, healthy.
+- Frontend PRs #79 and #80 are merged in `sifutech-ux/beshareaisolution`; live cache version is `20261113ai2`.
+- Only the production `advice` service was recreated. Account, database, WhatsApp and Studio services were not restarted.
+- `/opt/beshare-copilot-production/docker-compose.override.yaml` selects the pinned image and OpenAI provider; `copilot-openai.env` holds the approved key with mode 0600.
+- Original compose and environment are backed up in `/opt/beshare-copilot-openai-20261113/rollback`.
+- The controlled QA account received a Malay answer with exactly three actions for a synthetic RM100 coffee-shop budget. The answer remained after a browser reload.
+- Live Dengar decoded the generated WAV and reached `Suara AI sedang dimainkan.` in Chrome. Acoustic quality and physical iPhone playback were not assessed.
+- Unauthenticated speech returned HTTP 401. OpenAI provider smoke tests returned HTTP 200 for both Responses and WAV speech.
+- A live-only frontend ReferenceError was corrected in PR #80. The regression test now executes the real session reader with synthetic localStorage and no artificial global session; it failed before the fix and passed after it.
+
+To roll back, move `docker-compose.override.yaml` out of this directory and repeat the advice-only compose command below. The original compose still pins the previous image. Keep the backed-up configuration and protected key file; do not print their values.
+
+Deployment procedure used:
 
 1. Verify the advice image and save compose/config for rollback, without printing secret values.
 2. Build a new advice image from the reviewed source using the existing production build procedure.
@@ -48,8 +62,8 @@ node --experimental-strip-types --import ./tests/resolve-ts.mjs --test tests/cop
 32 focused tests and type checking passed with synthetic provider/account responses.
 They do not verify live model access or voice quality. The broader suite requires an isolated
 account checkout via `COPILOT_TEST_AKAUN_ROOT` and executable ffmpeg; these prerequisites are absent.
-The approved local key is present, but the live `/v1/models` request timed out. Terminal approval
-also timed out twice. No production settings or secrets have been written.
+Earlier Mac connectivity checks timed out. Subsequent VPS model, text and speech requests succeeded,
+and the production configuration and controlled browser verification described above are complete.
 
 ## Speech maintenance deadline
 
