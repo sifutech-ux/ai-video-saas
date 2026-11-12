@@ -21,7 +21,7 @@ Status: implemented and locally verified; NOT deployed to production. The existi
 
 ## Verification
 
-Automated: 40 targeted advice/backend tests, 7 frontend audio/lifecycle tests and 41 SQLite account tests pass. 24 existing PostgreSQL tests are skipped locally because no PostgreSQL test database is configured. Next production webpack build and TypeScript checks pass.
+Automated: 40 targeted advice/backend tests, 7 frontend audio/lifecycle tests and 41 SQLite account tests pass. 32 PostgreSQL tests (24 existing and 8 intelligence variants) are skipped locally because no PostgreSQL test database is configured. An isolated Compose fixture is prepared in account tests/postgres_fixture.py; its remote execution awaits explicit private-source transfer authorization after automatic approval review blocked the first attempt. Next production webpack build and TypeScript checks pass.
 
 Browser UI: real local account service with a temporary synthetic SQLite database and explicitly labelled model fixtures. Verified memory persistence across reload, action preview/confirmation, RM350 income + RM120 cost, confirmed-status replay, marketing paragraphs/editor, add-to-plan and refreshed focus. Inspected desktop 1440x1000 and phone 390x844; profile form fits the 390px viewport. Provider calls and acoustic quality were not verified by these fixture tests.
 
