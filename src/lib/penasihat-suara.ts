@@ -41,8 +41,8 @@ export async function transcribeMalay(audioBase64: string, mime: string) {
   throw new Error(lastError)
 }
 
-export async function speakAdvice(jawapan: string, langkah: string[]) {
+export async function speakAdvice(jawapan: string, langkah: string[], copilot = false) {
   const spoken = penasihatSpoken(jawapan, langkah)
-  const audio = await synthesizeMalay(spoken, 'lelaki')
+  const audio = await synthesizeMalay(spoken, 'lelaki', copilot ? process.env.COPILOT_GEMINI_API_KEY || '' : undefined)
   return { audio: audio.buffer.toString('base64'), mime: audio.mime }
 }

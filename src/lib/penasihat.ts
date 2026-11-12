@@ -25,8 +25,42 @@ const STAGE_LABEL: Record<PenasihatStage, string> = {
   kembang: 'Nak kembangkan',
 }
 
+function deniedOriginHost(host: string) {
+  if (host === 'beshare-ipo-bot.onrender.com' || host.endsWith('.beshare-ipo-bot.onrender.com')) return true
+  if (host === 'localhost' || host.endsWith('.localhost') || host === '::1' || host.includes(':')) return true
+  return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)
+}
+
+export function exactHttpsOrigin(origin: string) {
+  if (!origin || origin.includes('*') || /\s/.test(origin)) return false
+  let url: URL
+  try {
+    url = new URL(origin)
+  } catch {
+    return false
+  }
+  if (url.origin !== origin || url.protocol !== 'https:') return false
+  if (url.username || url.password || url.search || url.hash || url.port) return false
+  if (url.pathname !== '/') return false
+  const host = url.hostname.toLowerCase()
+  if (!host || deniedOriginHost(host)) return false
+  return true
+}
+
+export function extraOrigins(): string[] | null {
+  const raw = process.env.PENASIHAT_EXTRA_ORIGINS
+  if (raw == null || raw.trim() === '') return []
+  const items = raw.split(',').map((item) => item.trim())
+  if (items.some((item) => !exactHttpsOrigin(item))) return null
+  return items
+}
+
 export function originAllowed(origin: string | null) {
-  return !!origin && PENASIHAT_ORIGINS.includes(origin)
+  if (!origin) return false
+  if (PENASIHAT_ORIGINS.includes(origin)) return true
+  const extra = extraOrigins()
+  if (!extra) return false
+  return extra.includes(origin)
 }
 
 export function penasihatStage(value: unknown): PenasihatStage | null {
