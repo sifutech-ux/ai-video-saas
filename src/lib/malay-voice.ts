@@ -93,8 +93,7 @@ function languageRejected(error: unknown) {
   return /language code|unsupported language|LANGUAGE/i.test(text)
 }
 
-async function geminiSpeech(text: string, voice: PresenterVoice): Promise<SpokenAudio | null> {
-  const key = process.env.GEMINI_API_KEY
+async function geminiSpeech(text: string, voice: PresenterVoice, key = process.env.GEMINI_API_KEY): Promise<SpokenAudio | null> {
   if (!key) return null
   const ai = new GoogleGenAI({ apiKey: key })
 
@@ -148,10 +147,10 @@ async function translateSpeech(text: string): Promise<SpokenAudio> {
   return { buffer: Buffer.concat(parts), mime: 'audio/mpeg' }
 }
 
-export async function synthesizeMalay(text: string, voice: PresenterVoice = 'lelaki'): Promise<SpokenAudio> {
+export async function synthesizeMalay(text: string, voice: PresenterVoice = 'lelaki', apiKey?: string): Promise<SpokenAudio> {
   const spoken = text.replace(/\s+/g, ' ').trim().slice(0, 800)
   if (!spoken) throw new Error('Sila sediakan skrip suara.')
-  const gemini = await geminiSpeech(spoken, voice)
+  const gemini = await geminiSpeech(spoken, voice, apiKey)
   if (gemini) return gemini
   if (voice === 'lelaki') {
     throw new Error('Suara lelaki tidak dapat dijana sekarang. Sila cuba sekali lagi.')

@@ -1,4 +1,5 @@
 import { TEXT_MODELS, textThinking } from './gemini-text'
+import { askOpenAIOnce, copilotOpenAIKey } from './copilot-openai'
 
 /**
  * Satu percubaan sahaja. Gelung Studio dalam gemini-text tidak diubah.
@@ -69,9 +70,17 @@ export const publicRuntime = {
 }
 
 export async function askCopilotOnce(prompt: string) {
+  if (process.env.COPILOT_AI_PROVIDER === 'openai') return askOpenAIOnce(prompt)
+  if (process.env.COPILOT_AI_PROVIDER && process.env.COPILOT_AI_PROVIDER !== 'gemini') throw new ModelAttemptError('tiada_kunci')
   const key = process.env.COPILOT_GEMINI_API_KEY || ''
   if (!key) throw new ModelAttemptError('tiada_kunci')
   return copilotRuntime.generate(prompt, key)
+}
+
+export function copilotKeyPresent() {
+  if (process.env.COPILOT_AI_PROVIDER === 'openai') return Boolean(copilotOpenAIKey())
+  if (process.env.COPILOT_AI_PROVIDER && process.env.COPILOT_AI_PROVIDER !== 'gemini') return false
+  return Boolean(process.env.COPILOT_GEMINI_API_KEY)
 }
 
 export async function askPublicOnce(prompt: string) {

@@ -126,10 +126,10 @@ function tempatan(ralat: 'model_gagal' | 'output_tidak_sah', soalan: Parameters<
   }
 }
 
-function geminiBody(reply: PenasihatReply) {
+function geminiBody(reply: PenasihatReply, provider: 'gemini' | 'openai' | 'tersimpan' = 'gemini') {
   return {
     ok: true,
-    sumber: 'gemini',
+    sumber: provider,
     bukan_model: false,
     jawapan: reply.jawapan,
     langkah: [reply.langkah[0], reply.langkah[1], reply.langkah[2]],
@@ -139,6 +139,7 @@ function geminiBody(reply: PenasihatReply) {
 const IDEM_RE = /^[A-Za-z0-9_-]{16,64}$/
 
 type ModelOnce = {
+  provider?: 'gemini' | 'openai'
   text: string
   model: string | null
   promptTokens: number | null
@@ -226,7 +227,7 @@ export async function adviseCopilot(input: {
     return { status: mapped.status, body: errorBody(mapped.error) }
   }
   if (reserved.status === 'settled') {
-    return { status: 200, body: { ...geminiBody(reserved.reply), main_semula: true } }
+    return { status: 200, body: { ...geminiBody(reserved.reply, 'tersimpan'), main_semula: true } }
   }
   const sending = await input.kuota.hantar(reserved.rezabId)
   if (!sending.ok) {
@@ -255,7 +256,7 @@ export async function adviseCopilot(input: {
     if (!settled.ok) {
       return { status: 503, body: errorBody('Keputusan permintaan ini belum pasti.') }
     }
-    return { status: 200, body: geminiBody(reply) }
+    return { status: 200, body: geminiBody(reply, attempt.provider) }
   } catch (error) {
     await simpan(input.kuota, { rezabId: reserved.rezabId, hasil: hasilRalat(error) })
     return { status: 502, body: tempatan('model_gagal', soalan) }

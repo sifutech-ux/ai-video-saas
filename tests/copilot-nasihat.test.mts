@@ -441,7 +441,7 @@ test('fetch sesi tidak mengekori redirect dan tidak menghantar id klien', async 
   }
   assert.equal(laluan.includes('askGemini'), false)
   assert.equal(laluan.includes('process.env.GEMINI_API_KEY'), false)
-  assert.equal(laluan.includes('process.env.COPILOT_GEMINI_API_KEY'), true)
+  assert.equal(laluan.includes('copilotKeyPresent'), true)
   assert.equal(laluan.includes('testLoopback'), false)
   assert.equal(model.includes('COPILOT_GEMINI_API_KEY'), true)
 })

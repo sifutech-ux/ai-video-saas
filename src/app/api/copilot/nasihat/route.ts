@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { adviseCopilot, copilotHeaders, fetchCopilotSession } from '@/lib/copilot-nasihat'
 import { createKuotaClient } from '@/lib/copilot-kuta'
-import { askCopilotOnce } from '@/lib/copilot-model'
+import { askCopilotOnce, copilotKeyPresent } from '@/lib/copilot-model'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     rateKey: clientKey(req),
     akaunUrl,
     idempotencyKey: req.headers.get('idempotency-key'),
-    copilotKeyPresent: () => Boolean(process.env.COPILOT_GEMINI_API_KEY),
+    copilotKeyPresent,
     introspect: fetchCopilotSession,
     kuota: createKuotaClient({
       akaunUrl,
