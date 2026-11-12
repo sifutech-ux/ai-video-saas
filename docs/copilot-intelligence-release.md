@@ -21,7 +21,7 @@ Status: implemented and locally verified; NOT deployed to production. The existi
 
 ## Verification
 
-Automated: 40 targeted advice/backend tests, 7 frontend audio/lifecycle tests and 41 SQLite account tests pass. 32 PostgreSQL tests (24 existing and 8 intelligence variants) are skipped locally because no PostgreSQL test database is configured. An isolated Compose fixture is prepared in account tests/postgres_fixture.py; its remote execution awaits explicit private-source transfer authorization after automatic approval review blocked the first attempt. Next production webpack build and TypeScript checks pass.
+Automated: 120 tests pass: 40 targeted advice/backend tests, 7 frontend audio/lifecycle tests, 41 SQLite account tests and 32 PostgreSQL tests (24 existing and 8 intelligence variants). The PostgreSQL 16.15 fixture completed on 13 November 2026 (Malaysia) in 53.180 seconds with zero errors, failures or skips. Both temporary containers exited with code 0; production containers retained their IDs and healthy status. Evidence is saved in account PR #47 at docs/qa/postgres-2026-11-13.json. Next production webpack build and TypeScript checks pass. Real provider and microphone acceptance remains pending.
 
 Browser UI: real local account service with a temporary synthetic SQLite database and explicitly labelled model fixtures. Verified memory persistence across reload, action preview/confirmation, RM350 income + RM120 cost, confirmed-status replay, marketing paragraphs/editor, add-to-plan and refreshed focus. Inspected desktop 1440x1000 and phone 390x844; profile form fits the 390px viewport. Provider calls and acoustic quality were not verified by these fixture tests.
 
@@ -42,6 +42,6 @@ In the account checkout: `python3 -m unittest discover -s tests`. For the fronte
 3. Ask “Catat jualan hari ini RM350 dan kos RM120”. Verify no records before confirmation; confirm once; reload/retry and verify exactly two records. Change a proposed plan's version and verify stale proposal rejection.
 4. Add/complete a plan task and edit the goal; verify focus updates and the CTA opens the correct workflow.
 5. Ask a simple question, a plan and a marketing draft. Verify response shape, paragraph persistence, copy, shortening, editing and adding a marketing task.
-6. Enable Realtime only on staging. Test allowed/denied microphone, Malay conversation, interruptions, transcript-to-composer, stop, logout, page hide, disconnection and five-minute expiry on Mac and iPhone. Confirm actual provider/model access and a real PostgreSQL test run before release.
+6. Enable Realtime only on staging. Test allowed/denied microphone, Malay conversation, interruptions, transcript-to-composer, stop, logout, page hide, disconnection and five-minute expiry on Mac and iPhone. Confirm actual provider/model access before release. The isolated PostgreSQL test run passed on 13 November 2026; paired staging acceptance still remains.
 
 Local synthetic preview (account checkout): `python3 tests/preview.py ../copilot-aurora-review`, then http://localhost:8000/qa. This fixture harness binds loopback only and is never part of deployment.
