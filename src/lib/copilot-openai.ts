@@ -1,3 +1,4 @@
+import { intelligenceSchema } from './copilot-intelligence'
 /** Server-only OpenAI adapter. No provider retries: the account reservation owns each attempt. */
 export class CopilotOpenAIError extends Error {
   readonly kind: 'provider_failed' | 'uncertain'
@@ -50,13 +51,13 @@ async function request<T>(path: string, body: unknown, read: (response: Response
   }
 }
 
-export async function askOpenAIOnce(prompt: string) {
+export async function askOpenAIOnce(prompt: string, enhanced = false) {
   return request('responses', {
     model: 'gpt-6-luna', input: prompt, store: false,
     reasoning: { effort: 'low' },
     // Product contract: <=80 words plus three short actions. Includes reasoning tokens.
-    max_output_tokens: 1600,
-    text: { verbosity: 'low', format: { type: 'json_schema', name: 'nasihat', strict: true, schema } },
+    max_output_tokens: enhanced ? 3000 : 1600,
+    text: { verbosity: 'low', format: { type: 'json_schema', name: 'nasihat', strict: true, schema: enhanced ? intelligenceSchema : schema } },
   }, async (response) => {
     const data = await response.json()
     if (data.status !== 'completed' || !Array.isArray(data.output)) throw new CopilotOpenAIError('provider_failed')
@@ -79,7 +80,7 @@ export async function speakOpenAI(text: string) {
     instructions: 'Baca tepat teks yang diberi dalam Bahasa Melayu Malaysia. Suara tenang, mesra dan jelas. Jangan tambah ayat.',
   }, async (response) => {
     const bytes = Buffer.from(await response.arrayBuffer())
-    if (bytes.length < 44 || bytes.length > 8_000_000 || bytes.subarray(0, 4).toString() !== 'RIFF'
+    if (bytes.length < 44 || bytes.length > 32_000_000 || bytes.subarray(0, 4).toString() !== 'RIFF'
       || bytes.subarray(8, 12).toString() !== 'WAVE') throw new CopilotOpenAIError('provider_failed')
     return { audio: bytes.toString('base64'), mime: 'audio/wav' }
   })

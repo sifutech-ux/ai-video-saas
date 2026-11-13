@@ -1,3 +1,4 @@
+import type { CopilotReply, Proposal } from './copilot-intelligence'
 import { createHash, createHmac, randomBytes } from 'node:crypto'
 
 /** Hos IPO tidak pernah menjadi destinasi akaun, walaupun ditetapkan secara tersurat. */
@@ -18,10 +19,7 @@ const REZAB = '/api/akaun/copilot/kuota/rezab'
 const HANTAR = '/api/akaun/copilot/kuota/hantar'
 const MUKTAMAD = '/api/akaun/copilot/kuota/muktamad'
 
-export type KuotaReply = {
-  jawapan: string
-  langkah: [string, string, string]
-}
+export type KuotaReply = CopilotReply
 
 export type KuotaRezab =
   | { ok: true; status: 'reserved'; rezabId: string }
@@ -50,7 +48,10 @@ export type KuotaClient = {
     rezabId: string
     hasil: 'settled' | 'provider_failed' | 'uncertain' | 'released'
     jawapan?: string
-    langkah?: [string, string, string]
+    langkah?: string[]
+    format?: CopilotReply['format']
+    cadangan?: Proposal[]
+    asas?: CopilotReply['asas']
     model?: string | null
     promptTokens?: number | null
     outputTokens?: number | null
@@ -206,13 +207,13 @@ export function createKuotaClient(options: {
       if (!data || data.ok !== true || typeof data.rezab_id !== 'string') return ralat(status, data)
       if (data.main_semula === true && data.status === 'settled') {
         const langkah = Array.isArray(data.langkah) ? data.langkah.filter((item): item is string => typeof item === 'string') : []
-        if (typeof data.jawapan !== 'string' || langkah.length !== 3) return failure(503, 'tidak_pasti')
+        if (typeof data.jawapan !== 'string' || langkah.length > 5) return failure(503, 'tidak_pasti')
         return {
           ok: true,
           status: 'settled',
           rezabId: data.rezab_id,
           mainSemula: true,
-          reply: { jawapan: data.jawapan, langkah: [langkah[0], langkah[1], langkah[2]] },
+          reply: { jawapan: data.jawapan, langkah, format: data.format as CopilotReply['format'], cadangan: data.cadangan as Proposal[], asas: data.asas as CopilotReply['asas'] },
         }
       }
       if (data.status !== 'reserved') return failure(status || 503, 'tidak_pasti')
@@ -228,6 +229,9 @@ export function createKuotaClient(options: {
       if (input.hasil === 'settled') {
         payload.jawapan = input.jawapan
         payload.langkah = input.langkah
+        if (input.format) payload.format = input.format
+        if (input.cadangan) payload.cadangan = input.cadangan
+        if (input.asas) payload.asas = input.asas
         payload.model = input.model ?? null
         if (typeof input.promptTokens === 'number') payload.prompt_tokens = input.promptTokens
         if (typeof input.outputTokens === 'number') payload.output_tokens = input.outputTokens

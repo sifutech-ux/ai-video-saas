@@ -1,3 +1,4 @@
+import { intelligencePrompt, parseIntelligence, type BusinessContext, type CopilotReply } from './copilot-intelligence'
 import { accountEndpoint, mapKuotaFailure, type KuotaClient } from './copilot-kuta'
 import {
   clipTurns,
@@ -7,7 +8,6 @@ import {
   penasihatPrompt,
   penasihatStage,
   tooManyNotes,
-  type PenasihatReply,
   type PenasihatStage,
 } from './penasihat'
 
@@ -126,13 +126,15 @@ function tempatan(ralat: 'model_gagal' | 'output_tidak_sah', soalan: Parameters<
   }
 }
 
-function geminiBody(reply: PenasihatReply, provider: 'gemini' | 'openai' | 'tersimpan' = 'gemini') {
+function geminiBody(reply: CopilotReply, provider: 'gemini' | 'openai' | 'tersimpan' = 'gemini') {
   return {
     ok: true,
     sumber: provider,
     bukan_model: false,
     jawapan: reply.jawapan,
-    langkah: [reply.langkah[0], reply.langkah[1], reply.langkah[2]],
+    langkah: reply.langkah,
+    ...(reply.format ? { format: reply.format } : {}),
+    ...(reply.cadangan ? { cadangan: reply.cadangan } : {}),
   }
 }
 
@@ -174,6 +176,7 @@ export async function adviseCopilot(input: {
   testLoopback?: boolean
   introspect: (akaunUrl: string, authorization: string) => Promise<CopilotSession>
   kuota: KuotaClient
+  contextReader?: (url: string, auth: string) => Promise<BusinessContext>
   ask: (prompt: string) => Promise<ModelOnce>
 }) {
   if (!originAllowed(input.origin)) {
@@ -205,7 +208,7 @@ export async function adviseCopilot(input: {
   }
 
   const data = input.body && typeof input.body === 'object' ? (input.body as Record<string, unknown>) : null
-  const giliran = clipTurns(data?.giliran)
+  const giliran = clipTurns(data?.giliran, input.contextReader ? 4000 : 600)
   if (giliran.at(-1)?.dari !== 'klien') {
     return { status: 400, body: errorBody('Sila tulis mesej.') }
   }
@@ -216,6 +219,11 @@ export async function adviseCopilot(input: {
     return { status: 503, body: errorBody('Nasihat tidak sedia. Cuba semula.') }
   }
 
+  let context: BusinessContext | undefined
+  if (input.contextReader) {
+    try { context = await input.contextReader(akaunUrl, authorization) }
+    catch { return { status: 503, body: errorBody('Data perniagaan belum dapat dibaca. Cuba semula.') } }
+  }
   const soalan = { ...session.penasihat, giliran }
   const reserved = await input.kuota.rezab({
     route: 'copilot_nasihat',
@@ -227,7 +235,7 @@ export async function adviseCopilot(input: {
     return { status: mapped.status, body: errorBody(mapped.error) }
   }
   if (reserved.status === 'settled') {
-    return { status: 200, body: { ...geminiBody(reserved.reply, 'tersimpan'), main_semula: true } }
+    return { status: 200, body: { ...geminiBody(reserved.reply, 'tersimpan'), cadangan_id: reserved.rezabId, main_semula: true } }
   }
   const sending = await input.kuota.hantar(reserved.rezabId)
   if (!sending.ok) {
@@ -236,10 +244,12 @@ export async function adviseCopilot(input: {
   }
 
   try {
-    const attempt = await input.ask(penasihatPrompt(soalan))
-    let reply: PenasihatReply
+    const attempt = await input.ask(context ? intelligencePrompt(session.penasihat, context, giliran) : penasihatPrompt(soalan))
+    let reply: CopilotReply
     try {
-      reply = parsePenasihatReply(attempt.text)
+      reply = context ? parseIntelligence(attempt.text) : parsePenasihatReply(attempt.text)
+      if (context) reply.asas = { minggu_mula: context.minggu_mula,
+        pelan_versi: context.pelan?.versi || 0, ingatan_versi: context.ingatan.versi }
     } catch {
       await simpan(input.kuota, { rezabId: reserved.rezabId, hasil: 'provider_failed' })
       return { status: 502, body: tempatan('output_tidak_sah', soalan) }
@@ -249,6 +259,7 @@ export async function adviseCopilot(input: {
       hasil: 'settled',
       jawapan: reply.jawapan,
       langkah: reply.langkah,
+      format: reply.format, cadangan: reply.cadangan, asas: reply.asas,
       model: attempt.model,
       promptTokens: attempt.promptTokens,
       outputTokens: attempt.outputTokens,
@@ -256,7 +267,7 @@ export async function adviseCopilot(input: {
     if (!settled.ok) {
       return { status: 503, body: errorBody('Keputusan permintaan ini belum pasti.') }
     }
-    return { status: 200, body: geminiBody(reply, attempt.provider) }
+    return { status: 200, body: { ...geminiBody(reply, attempt.provider), ...(context ? { cadangan_id: reserved.rezabId } : {}) } }
   } catch (error) {
     await simpan(input.kuota, { rezabId: reserved.rezabId, hasil: hasilRalat(error) })
     return { status: 502, body: tempatan('model_gagal', soalan) }
