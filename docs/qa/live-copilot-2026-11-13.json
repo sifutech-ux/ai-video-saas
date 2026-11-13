@@ -1,0 +1,130 @@
+{
+  "test_date_malaysia": "2026-11-13",
+  "advice_source": "f95c43cfb95a13b744e08008815868d7df4119ad",
+  "account_source": "cf1647d681536d586a89c0c2a6e45ec886481e99",
+  "scope": "Real Responses API + real protected account HTTP/HTTPS/PostgreSQL; real Realtime adapter and synthetic WebRTC input/output in Chrome on Mac.",
+  "text": {
+    "checks": [
+      {
+        "name": "Unauthenticated advice and voice rejected"
+      },
+      {
+        "name": "Saved memory used by real model; other account isolated",
+        "detail": "Harga latte yang anda simpan ialah RM8.00."
+      },
+      {
+        "name": "Updated memory used by next real response",
+        "detail": "Harga latte dalam ingatan anda ialah RM9.50."
+      },
+      {
+        "name": "Real proposals require owner confirmation; duplicate save and model replay prevented",
+        "detail": {
+          "proposal": "Cadangan untuk dicatat bagi 2026-11-13: hasil RM350 dan kos RM120. Tekan “Sahkan & simpan” untuk menyimpan.",
+          "totals": {
+            "dari": "2026-11-09",
+            "hingga": "2026-11-13",
+            "bilangan_hasil": 1,
+            "bilangan_kos": 1,
+            "hasil": "350.00",
+            "kos": "120.00",
+            "beza_rekod": "230.00"
+          }
+        }
+      },
+      {
+        "name": "Real analysis uses exact server totals",
+        "detail": "Minggu ini (9–13 November 2026), hasil direkodkan sebanyak RM350.00 dan kos RM120.00. Beza rekod ialah RM230.00; ini bukan untung bersih."
+      },
+      {
+        "name": "Marketing format and paragraphs persist in account",
+        "detail": "Latte RM9.50 untuk teman hari kerja anda. ☕\n\nSinggah nikmati kopi di Ampang—sesuai untuk rehat seketika atau mulakan hari dengan segar.\n\nNak latte? Jom singgah hari ini!"
+      },
+      {
+        "name": "Real task proposal saved to current-week plan",
+        "detail": "Cadangan tugasan disediakan. Tekan “Sahkan & simpan” untuk menyimpannya."
+      },
+      {
+        "name": "Empty account response reviewed against absent records",
+        "detail": "Untuk minggu ini, 9–13 November 2026, tiada rekod hasil atau kos. Jumlahnya tiada dalam data, jadi bukan RM0."
+      }
+    ],
+    "providerRequests": 7
+  },
+  "voice": {
+    "connected": true,
+    "bytesReceived": 188286,
+    "inputTranscript": "Berapakah harga lati saya sekarang?",
+    "outputTranscript": "Harga latte dalam rekod anda sekarang ialah RM9.50. Itu maklumat yang ada dalam ingatan akaun, bukan sifar.",
+    "events": [
+      "datachannel.open"
+    ],
+    "stop_confirmed": true,
+    "model": "gpt-realtime-2.1",
+    "voice": "cedar",
+    "input": "AI-generated WAV: Berapakah harga latte saya sekarang?",
+    "physical_microphone_used": false,
+    "output_listening_assessed": false
+  },
+  "initial_voice_attempt": {
+    "media_success": false,
+    "reason": "Manual SDP relay completed too late; browser ICE failed with no media. Provider session creation, duplicate limit and foreign-owner stop rejection passed; session cleanup returned success.",
+    "overall_fixture_exit": 1
+  },
+  "voice_retry": {
+    "media_success": true,
+    "method": "Same createRealtimeCall adapter and synthetic business context; local page polls the SDP answer immediately. No additional text-model calls.",
+    "container_exit": 0
+  },
+  "fixture_states": [
+    {
+      "name": "copilot-live-qa-20261113",
+      "state": "stopped",
+      "containers": [
+        {
+          "name": "copilot-live-qa-20261113-account-1",
+          "status": "Exited (137) 5 minutes ago"
+        },
+        {
+          "name": "copilot-live-qa-20261113-postgres-1",
+          "status": "Exited (0) 5 minutes ago"
+        },
+        {
+          "name": "copilot-live-qa-20261113-tests-1",
+          "status": "Exited (1) 5 minutes ago"
+        }
+      ]
+    },
+    {
+      "name": "copilot-voice-qa-20261113",
+      "state": "stopped",
+      "containers": [
+        {
+          "name": "copilot-voice-qa-20261113-voice-1",
+          "status": "Exited (0) 57 seconds ago"
+        }
+      ]
+    }
+  ],
+  "production": [
+    {
+      "name": "copilot-production-account-1",
+      "id": "a64af8e1eae8",
+      "health": "healthy"
+    },
+    {
+      "name": "copilot-production-advice-1",
+      "id": "d76979522982",
+      "health": "healthy"
+    },
+    {
+      "name": "copilot-production-copilot-postgres-1",
+      "id": "455a27351c95",
+      "health": "healthy"
+    }
+  ],
+  "remaining": [
+    "Paired full-app staging UI with real responses",
+    "Physical Mac/iPhone microphone, interruptions and acoustic quality",
+    "Five-minute live expiry and disconnect recovery acceptance"
+  ]
+}

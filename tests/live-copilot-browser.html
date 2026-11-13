@@ -1,0 +1,25 @@
+<!doctype html><html lang="ms"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ujian suara Copilot</title><style>body{font:16px system-ui;max-width:960px;margin:35px auto;padding:0 20px;background:#101525;color:#e8ecff}button{padding:12px;margin:5px;border:0;border-radius:8px;background:#bac5ff;color:#101525;font-weight:700}textarea{width:100%;height:90px;background:#1d2540;color:#d8e0ff}pre{white-space:pre-wrap;background:#1d2540;padding:15px;border-radius:10px}audio{width:100%}</style>
+<h1>Ujian suara Copilot</h1><p>Audio input dijana AI untuk akaun sintetik. Mikrofon tidak digunakan dalam ujian automatik ini.</p>
+<button id="prepare">1. Sediakan sambungan</button><button id="answer">2. Muat jawapan server</button><button id="speak">3. Hantar audio ujian</button><button id="stop">Hentikan audio</button>
+<p id="status">Belum bermula.</p><audio id="audio" controls autoplay></audio>
+<label>SDP ujian<textarea id="offer" readonly></textarea></label><h2>Transkrip</h2><pre id="transcript">Belum ada.</pre><h2>Keputusan</h2><pre id="result">{}</pre><details><summary>Peristiwa sambungan</summary><pre id="events"></pre></details>
+<script>
+let pc,dc,ctx,dest,tone,interval;const audio=document.querySelector('#audio');audio.muted=true;
+const result={connected:false,bytesReceived:0,inputTranscript:'',outputTranscript:'',events:[]};
+const status=t=>document.querySelector('#status').textContent=t;
+const render=()=>{document.querySelector('#result').textContent=JSON.stringify(result,null,2);document.querySelector('#transcript').textContent='Input: '+result.inputTranscript+'\n\nAI: '+result.outputTranscript};
+document.querySelector('#prepare').onclick=async()=>{try{
+ ctx=new AudioContext();await ctx.resume();dest=ctx.createMediaStreamDestination();tone=ctx.createOscillator();const silence=ctx.createGain();silence.gain.value=0;tone.connect(silence).connect(dest);tone.start();
+ pc=new RTCPeerConnection();pc.addTrack(dest.stream.getAudioTracks()[0]);pc.ontrack=e=>{audio.srcObject=e.streams[0];audio.play().catch(()=>status('Tekan play untuk mendengar audio AI.'))};
+ pc.onconnectionstatechange=()=>{result.connected=pc.connectionState==='connected';status('Sambungan: '+pc.connectionState);render()};
+ dc=pc.createDataChannel('oai-events');dc.onopen=()=>{status('Saluran Realtime terbuka. Sedia hantar audio ujian.');result.events.push('datachannel.open');render()};
+ dc.onmessage=e=>{const v=JSON.parse(e.data);if(v.type==='error'){result.events.push(v);status('Ralat Realtime')}if(v.type==='conversation.item.input_audio_transcription.completed')result.inputTranscript=v.transcript;if(['response.output_audio_transcript.done','response.audio_transcript.done'].includes(v.type))result.outputTranscript=v.transcript;if(!v.type.endsWith('.delta'))document.querySelector('#events').textContent+=v.type+'\n';render()};
+ await pc.setLocalDescription(await pc.createOffer());await new Promise(resolve=>{if(pc.iceGatheringState==='complete')return resolve();pc.addEventListener('icegatheringstatechange',()=>{if(pc.iceGatheringState==='complete')resolve()});setTimeout(resolve,4000)});
+ document.querySelector('#offer').value=JSON.stringify({sdp:pc.localDescription.sdp});status('SDP sedia dihantar ke pelayan ujian.');
+ interval=setInterval(async()=>{if(!pc||pc.connectionState==='closed')return;for(const r of (await pc.getStats()).values())if(r.type==='inbound-rtp'&&r.kind==='audio')result.bytesReceived=r.bytesReceived||0;render()},1000);
+}catch(e){status(e.message)}};
+document.querySelector('#answer').onclick=async()=>{status('Menunggu jawapan server secara automatik.');const until=Date.now()+120000;while(Date.now()<until){try{const r=await fetch('/live-answer.json',{cache:'no-store'});if(r.ok){await pc.setRemoteDescription({type:'answer',sdp:(await r.json()).sdp});status('Menunggu saluran Realtime.');return}}catch(e){status(e.message);return}await new Promise(r=>setTimeout(r,500))}status('Jawapan server belum tersedia.');};
+document.querySelector('#speak').onclick=async()=>{try{if(dc?.readyState!=='open')throw Error('Saluran belum terbuka.');const r=await fetch('/live-audio.json',{cache:'no-store'});if(!r.ok)throw Error('Audio ujian belum tersedia.');const {audio:data}=await r.json();const bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));const source=ctx.createBufferSource();source.buffer=await ctx.decodeAudioData(bytes.buffer);source.connect(dest);source.start();status('Menghantar audio sintetik: Berapakah harga latte saya sekarang?')}catch(e){status(e.message)}};
+document.querySelector('#stop').onclick=()=>{clearInterval(interval);dest?.stream.getTracks().forEach(t=>t.stop());tone?.stop();dc?.close();pc?.close();ctx?.close();audio.srcObject=null;status('Audio dan sambungan browser dihentikan.');};
+</script></html>
