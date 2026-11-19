@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { originAllowed, penasihatSpoken, tooManyNotes } from '@/lib/penasihat'
+import { originAllowed, tooManyNotes } from '@/lib/penasihat'
 import { speakAdvice } from '@/lib/penasihat-suara'
 import { copilotHeaders, fetchCopilotSession } from '@/lib/copilot-nasihat'
 import { speakOpenAI } from '@/lib/copilot-openai'
@@ -51,13 +51,13 @@ export async function POST(req: Request) {
   const data = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
   const jawapan = typeof data.jawapan === 'string' ? data.jawapan : ''
   const langkah = Array.isArray(data.langkah) ? data.langkah.filter((item): item is string => typeof item === 'string') : []
-  if (jawapan.trim().length < 2 || jawapan.length > 2000 || langkah.length > 3 || langkah.some((item) => item.length > 600)) {
+  if (jawapan.trim().length < 2 || jawapan.length > 4000 || langkah.length > 5 || langkah.some((item) => item.length > 600)) {
     return NextResponse.json({ error: 'Tiada ayat untuk dibaca.' }, { status: 400, headers })
   }
 
   try {
     const spoken = process.env.COPILOT_AI_PROVIDER === 'openai'
-      ? await speakOpenAI(penasihatSpoken(jawapan, langkah).slice(0, 800))
+      ? await speakOpenAI([jawapan, ...langkah.map((line, index) => `Langkah ${index + 1}. ${line}`)].join(' ').slice(0, 5500))
       : await speakAdvice(jawapan, langkah, Boolean(akaunUrl))
     return NextResponse.json({ ok: true, ...spoken }, { headers })
   } catch (error) {

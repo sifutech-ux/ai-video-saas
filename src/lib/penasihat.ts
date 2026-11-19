@@ -67,7 +67,7 @@ export function penasihatStage(value: unknown): PenasihatStage | null {
   return value === 'mula' || value === 'jual' || value === 'kembang' ? value : null
 }
 
-export function clipTurns(value: unknown): PenasihatTurn[] {
+export function clipTurns(value: unknown, limit = 600): PenasihatTurn[] {
   if (!Array.isArray(value)) return []
   const turns: PenasihatTurn[] = []
   for (const item of value) {
@@ -75,7 +75,7 @@ export function clipTurns(value: unknown): PenasihatTurn[] {
     const dari = (item as { dari?: unknown }).dari
     const teks = (item as { teks?: unknown }).teks
     if ((dari !== 'klien' && dari !== 'penasihat') || typeof teks !== 'string') continue
-    const clean = teks.replace(/\s+/g, ' ').trim().slice(0, 600)
+    const clean = teks.trim().slice(0, Math.min(limit, 4000))
     if (!clean) continue
     turns.push({ dari, teks: clean })
   }

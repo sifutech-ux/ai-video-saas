@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { accountEndpoint, copilotSignature, createKuotaClient } from '../src/lib/copilot-kuta.ts'
+import { accountEndpoint, copilotSignature, createKuotaClient, mapKuotaFailure } from '../src/lib/copilot-kuta.ts'
 import { askCopilotOnce, askPublicOnce, copilotRuntime } from '../src/lib/copilot-model.ts'
 
 const BADAN = new TextEncoder().encode(
@@ -146,5 +146,66 @@ test('kunci copilot tidak jatuh ke kunci studio', async () => {
     else process.env.GEMINI_API_KEY = studio
     if (copilot === undefined) delete process.env.COPILOT_GEMINI_API_KEY
     else process.env.COPILOT_GEMINI_API_KEY = copilot
+  }
+})
+
+test('retryability memerlukan kegagalan pembekal yang disahkan akaun', async () => {
+  const previous = process.env.COPILOT_AKAUN_HOST
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
+  try {
+    for (const item of [
+      { status: 503, data: { ok: false, ralat: 'provider_failed', retryable: true }, retryable: true },
+      { status: 503, data: { ok: false, ralat: 'provider_failed' }, retryable: undefined },
+      { status: 503, data: { ok: false, ralat: 'provider_failed', retryable: 'true' }, retryable: undefined },
+      { status: 200, data: { ok: false, ralat: 'provider_failed', retryable: true }, retryable: undefined },
+      { status: 503, data: { ok: true, ralat: 'provider_failed', retryable: true }, retryable: undefined },
+      { status: 503, data: { ok: false, ralat: 'tidak_pasti', retryable: true }, retryable: undefined },
+      { status: 409, data: { ok: false, ralat: 'menunggu', retryable: true }, retryable: undefined },
+    ]) {
+      const client = createKuotaClient({
+        akaunUrl: 'https://akaun.beshareaisolution.com', secret: 'kuta-ujian',
+        fetchImpl: async () => Response.json({ ...item.data, error: 'PRIVATE-UPSTREAM-DETAIL' }, { status: item.status }),
+      })
+      const result = await client.rezab({ route: 'copilot_nasihat', idempotencyKey: 'idem-contract-0001',
+        giliran: [{ dari: 'klien', teks: 'Sediakan draf.' }] })
+      assert.equal(result.ok, false)
+      if (result.ok) throw new Error('Expected quota failure')
+      assert.equal(result.retryable, item.retryable)
+      const mapped = mapKuotaFailure(result.status, result.ralat, result.retryable)
+      assert.equal(mapped.ralat, item.data.ralat)
+      assert.equal(mapped.retryable, item.retryable)
+      assert.equal(JSON.stringify(mapped).includes('PRIVATE-UPSTREAM-DETAIL'), false)
+    }
+  } finally {
+    if (previous === undefined) delete process.env.COPILOT_AKAUN_HOST
+    else process.env.COPILOT_AKAUN_HOST = previous
+  }
+})
+
+test('muktamad tidak menganggap pengakuan hilang atau status lain sebagai berjaya', async () => {
+  const previous = process.env.COPILOT_AKAUN_HOST
+  process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
+  try {
+    for (const item of [
+      { status: 200, data: { ok: true }, ok: false },
+      { status: 200, data: { ok: true, status: 'sending' }, ok: false },
+      { status: 200, data: { ok: true, status: 'uncertain' }, ok: false },
+      { status: 503, data: { ok: true, status: 'provider_failed' }, ok: false },
+      { status: 200, data: { ok: true, status: 'provider_failed' }, ok: true },
+    ]) {
+      const client = createKuotaClient({
+        akaunUrl: 'https://akaun.beshareaisolution.com', secret: 'kuta-ujian',
+        fetchImpl: async () => Response.json(item.data, { status: item.status }),
+      })
+      const result = await client.muktamad({ rezabId: 'rezab-ujian-0001', hasil: 'provider_failed' })
+      assert.equal(result.ok, item.ok)
+      if (!result.ok) {
+        assert.equal(result.ralat, 'simpanan_tidak_pasti')
+        assert.equal(result.retryable, undefined)
+      }
+    }
+  } finally {
+    if (previous === undefined) delete process.env.COPILOT_AKAUN_HOST
+    else process.env.COPILOT_AKAUN_HOST = previous
   }
 })

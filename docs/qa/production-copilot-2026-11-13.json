@@ -1,0 +1,27 @@
+{
+  "date_malaysia": "2026-11-13",
+  "status": "live",
+  "url": "https://beshareaisolution.com/penasihat/",
+  "features": [
+    "Editable business memory",
+    "Advice based on saved account context",
+    "Confirmed actions with duplicate-save protection",
+    "Daily focus",
+    "Flexible replies and marketing drafts",
+    "Two-way voice interface"
+  ],
+  "validation": {
+    "automated_checks": 120,
+    "public_https_checks_passed": 6,
+    "release_assets_verified": 4,
+    "browser_checks": [
+      "Memory saved and persisted after reload",
+      "AI correctly answered RM9.50 using synthetic saved product data",
+      "Voice controls rendered"
+    ]
+  },
+  "remaining_phone_tests": [
+    "Physical microphone and audio quality",
+    "Voice session expiry and disconnect recovery"
+  ]
+}

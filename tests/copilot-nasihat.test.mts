@@ -253,6 +253,7 @@ test('profil kosong, kunci tiada, dan kuota penuh tidak memanggil gemini', async
     ask,
   }))
   assert.equal(kosong.status, 422)
+  assert.equal(kosong.body.ralat, 'profil')
   const kunci = await adviseCopilot(asas({
     rateKey: 'kunci-tiada',
     now: 5_100,
@@ -295,7 +296,38 @@ test('profil kosong, kunci tiada, dan kuota penuh tidak memanggil gemini', async
     ask,
   }))
   assert.equal(proses.status, 409)
+  assert.equal(proses.body.ralat, 'menunggu')
+  assert.equal(proses.body.retryable, undefined)
   assert.equal(model, 0)
+})
+
+test('status rezab sampai kepada klien tanpa panggilan model atau perubahan keadaan', async () => {
+  for (const failure of [
+    { ok: false, status: 409, ralat: 'menunggu' },
+    { ok: false, status: 409, ralat: 'kunci_berbeza' },
+    { ok: false, status: 503, ralat: 'tidak_pasti' },
+    { ok: false, status: 503, ralat: 'provider_failed', retryable: true },
+    { ok: false, status: 503, ralat: 'provider_failed' },
+  ] as const) {
+    const unexpected = async () => { throw new Error('No send, finalization or model call expected') }
+    const result = await adviseCopilot(asas({
+      rateKey: `contract-${failure.ralat}-${failure.retryable || false}`,
+      kuota: { rezab: async () => failure, hantar: unexpected, muktamad: unexpected },
+      ask: unexpected,
+    }))
+    assert.equal(result.status, failure.status)
+    assert.equal(result.body.ralat, failure.ralat)
+    assert.equal(result.body.retryable, failure.retryable)
+    assert.equal(result.body.jawapan, undefined)
+  }
+  const pending = await adviseCopilot(asas({
+    rateKey: 'contract-hantar',
+    kuota: { ...kuotaLulus(), hantar: async () => ({ ok: false, status: 409, ralat: 'menunggu' }) },
+    ask: async () => { throw new Error('No provider call after failed hantar') },
+  }))
+  assert.equal(pending.status, 409)
+  assert.equal(pending.body.ralat, 'menunggu')
+  assert.equal(pending.body.retryable, undefined)
 })
 
 test('balasan disimpan diulang tanpa model dan simpanan gagal tidak dedah jawapan', async () => {
@@ -352,6 +384,8 @@ test('balasan disimpan diulang tanpa model dan simpanan gagal tidak dedah jawapa
   assert.equal(simpan.status, 503)
   assert.equal(JSON.stringify(simpan.body).includes('Tulis satu ayat'), false)
   assert.equal(simpan.body.ok, undefined)
+  assert.equal(simpan.body.ralat, 'tidak_pasti')
+  assert.equal(simpan.body.retryable, undefined)
   assert.equal(model, 1)
   assert.equal(calls.muktamad.length, 3)
   assert.equal(calls.hantar, 1)
@@ -371,25 +405,91 @@ test('kegagalan dan output model yang rosak bukan kejayaan', async () => {
   assert.equal(gagal.body.ok, false)
   assert.equal(gagal.body.sumber, 'tempatan')
   assert.equal(gagal.body.bukan_model, true)
-  assert.equal(gagal.body.ralat, 'model_gagal')
+  assert.equal(gagal.body.ralat, 'tidak_pasti')
+  assert.equal(gagal.body.sebab, 'model_gagal')
+  assert.equal(gagal.body.retryable, undefined)
   assert.match(String(gagal.body.label), /bukan jawapan model/)
   assert.equal(JSON.stringify(gagal.body).includes('uncertain'), false)
   assert.deepEqual(gagalCalls.muktamad, ['uncertain'])
 
   const rosakCalls = { hantar: 0, muktamad: [] as Array<string | undefined> }
-  const rosak = await adviseCopilot(asas({
-    rateKey: 'output-rosak',
-    now: 7_000,
-    kuota: kuotaLulus(rosakCalls),
-    ask: async () => ({ text: '{"jawapan":"Untung RM888881","langkah":["satu"]}', model: 'm', promptTokens: null, outputTokens: null }),
-  }))
+  const previousWarn = console.warn, events: unknown[] = []
+  console.warn = (event: unknown) => { events.push(event) }
+  let rosak: Awaited<ReturnType<typeof adviseCopilot>>
+  try {
+    rosak = await adviseCopilot(asas({
+      rateKey: 'output-rosak',
+      now: 7_000,
+      kuota: kuotaLulus(rosakCalls),
+      ask: async () => ({ text: '{"jawapan":"Untung RM888881","langkah":["satu"]}', model: 'm', promptTokens: null, outputTokens: null }),
+    }))
+  } finally { console.warn = previousWarn }
+  assert.deepEqual(events, ['{"event":"copilot_reply_invalid"}'])
   assert.equal(rosak.status, 502)
   assert.equal(rosak.body.ok, false)
-  assert.equal(rosak.body.ralat, 'output_tidak_sah')
+  assert.equal(rosak.body.ralat, 'provider_failed')
+  assert.equal(rosak.body.sebab, 'output_tidak_sah')
+  assert.equal(rosak.body.retryable, true)
   assert.equal(rosak.body.sumber, 'tempatan')
   assert.equal(JSON.stringify(rosak.body).includes('RM888881'), false)
   assert.equal(Array.isArray(rosak.body.langkah) && rosak.body.langkah.length === 3, true)
   assert.deepEqual(rosakCalls.muktamad, ['provider_failed'])
+})
+
+test('model gagal boleh dijana semula hanya selepas pengakuan muktamad yang tepat', async () => {
+  for (const mode of ['confirmed', 'unavailable', 'mismatched', 'throws'] as const) {
+    let model = 0
+    const finalized: string[] = []
+    const result = await adviseCopilot(asas({
+      rateKey: `failure-finalization-${mode}`,
+      kuota: {
+        ...kuotaLulus(),
+        async muktamad(input) {
+          finalized.push(input.hasil)
+          if (mode === 'throws') throw new Error('PRIVATE-DATABASE-DETAIL')
+          if (mode === 'unavailable') return { ok: false, status: 503, ralat: 'kuota_tidak_sedia' }
+          return { ok: true, status: mode === 'confirmed' ? 'provider_failed' : 'uncertain' }
+        },
+      },
+      ask: async () => { model += 1; throw new ModelAttemptError('provider_failed') },
+    }))
+    assert.equal(model, 1)
+    assert.deepEqual(finalized, Array(mode === 'unavailable' || mode === 'throws' ? 3 : 1).fill('provider_failed'))
+    assert.equal(JSON.stringify(result).includes('PRIVATE-DATABASE-DETAIL'), false)
+    if (mode === 'confirmed') {
+      assert.equal(result.status, 502)
+      assert.equal(result.body.ralat, 'provider_failed')
+      assert.equal(result.body.retryable, true)
+      assert.equal(result.body.ok, false)
+      assert.equal(result.body.sumber, 'tempatan')
+      assert.equal(result.body.bukan_model, true)
+    } else {
+      assert.equal(result.status, 503)
+      assert.equal(result.body.ralat, 'tidak_pasti')
+      assert.equal(result.body.retryable, undefined)
+      assert.equal(result.body.jawapan, undefined)
+    }
+  }
+})
+
+test('simpanan yang melempar tidak mengelaskan semula model berjaya sebagai provider_failed', async () => {
+  let model = 0
+  const finalized: string[] = []
+  const result = await adviseCopilot(asas({
+    rateKey: 'successful-model-finalization-throws',
+    kuota: {
+      ...kuotaLulus(),
+      async muktamad(input) { finalized.push(input.hasil); throw new Error('PRIVATE-STORAGE-DETAIL') },
+    },
+    ask: async () => { model += 1; return jawapanModel() },
+  }))
+  assert.equal(model, 1)
+  assert.deepEqual(finalized, ['settled', 'settled', 'settled'])
+  assert.equal(result.status, 503)
+  assert.equal(result.body.ralat, 'tidak_pasti')
+  assert.equal(result.body.retryable, undefined)
+  assert.equal(result.body.jawapan, undefined)
+  assert.equal(JSON.stringify(result).includes('PRIVATE-STORAGE-DETAIL'), false)
 })
 
 test('had kadar berlaku sebelum panggilan akaun', async () => {
@@ -437,8 +537,9 @@ test('fetch sesi tidak mengekori redirect dan tidak menghantar id klien', async 
   for (const fail of [sumber, laluan, model]) {
     assert.equal(fail.includes('AKAUN_SECRET'), false)
     assert.equal(fail.includes('TELEGRAM_BOT_TOKEN'), false)
-    assert.equal(fail.includes('console.'), false)
   }
+  assert.equal(laluan.includes('console.'), false)
+  assert.equal(model.includes('console.'), false)
   assert.equal(laluan.includes('askGemini'), false)
   assert.equal(laluan.includes('process.env.GEMINI_API_KEY'), false)
   assert.equal(laluan.includes('copilotKeyPresent'), true)
