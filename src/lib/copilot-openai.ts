@@ -1,12 +1,33 @@
 import { intelligenceSchema } from './copilot-intelligence'
+type FailureReason = 'provider_failed' | 'uncertain' | 'http_error' | 'timeout' | 'transport'
+  | 'output_limit' | 'incomplete' | 'response_invalid' | 'refusal' | 'empty_output' | 'invalid_audio'
 /** Server-only OpenAI adapter. No provider retries: the account reservation owns each attempt. */
 export class CopilotOpenAIError extends Error {
   readonly kind: 'provider_failed' | 'uncertain'
-  constructor(kind: 'provider_failed' | 'uncertain') {
+  readonly reason: FailureReason
+  readonly httpStatus?: number
+  readonly providerCode?: string
+  constructor(kind: 'provider_failed' | 'uncertain', reason: FailureReason = kind, httpStatus?: number, providerCode?: string) {
     super(kind)
     this.name = 'CopilotOpenAIError'
     this.kind = kind
+    this.reason = reason
+    this.httpStatus = httpStatus
+    this.providerCode = providerCode
   }
+}
+
+// Log only classifications chosen here. Provider messages can contain user data.
+const providerCodes = new Set(['insufficient_quota', 'rate_limit_exceeded', 'invalid_api_key',
+  'model_not_found', 'permission_denied', 'invalid_request_error', 'server_error',
+  'context_length_exceeded', 'unsupported_parameter', 'invalid_json_schema',
+  'billing_hard_limit_reached', 'budget_exceeded', 'content_policy_violation'])
+
+function recordFailure(error: CopilotOpenAIError) {
+  console.warn(JSON.stringify({ event: 'copilot_provider_failure', provider: 'openai',
+    kind: error.kind, reason: error.reason,
+    ...(error.httpStatus ? { http_status: error.httpStatus } : {}),
+    ...(error.providerCode ? { provider_code: error.providerCode } : {}) }))
 }
 
 export function copilotOpenAIKey() {
@@ -39,13 +60,18 @@ async function request<T>(path: string, body: unknown, read: (response: Response
       body: JSON.stringify(body),
       redirect: 'error', cache: 'no-store', signal: controller.signal,
     })
-    if (!response.ok) throw new CopilotOpenAIError('provider_failed')
+    if (!response.ok) {
+      const data = await response.json().catch(() => null)
+      const code = typeof data?.error?.code === 'string' && providerCodes.has(data.error.code) ? data.error.code : 'other'
+      throw new CopilotOpenAIError('provider_failed', 'http_error', response.status, code)
+    }
     return await read(response)
   } catch (error) {
-    if (controller.signal.aborted) throw new CopilotOpenAIError('uncertain')
-    if (error instanceof CopilotOpenAIError) throw error
+    const failure = controller.signal.aborted ? new CopilotOpenAIError('uncertain', 'timeout')
+      : error instanceof CopilotOpenAIError ? error : new CopilotOpenAIError('uncertain', 'transport')
+    recordFailure(failure)
     // A transport failure may happen after the provider accepted the request.
-    throw new CopilotOpenAIError('uncertain')
+    throw failure
   } finally {
     clearTimeout(timer)
   }
@@ -60,13 +86,18 @@ export async function askOpenAIOnce(prompt: string, enhanced = false) {
     text: { verbosity: 'low', format: { type: 'json_schema', name: 'nasihat', strict: true, schema: enhanced ? intelligenceSchema : schema } },
   }, async (response) => {
     const data = await response.json()
-    if (data.status !== 'completed' || !Array.isArray(data.output)) throw new CopilotOpenAIError('provider_failed')
+    if (data?.status !== 'completed' || !Array.isArray(data.output)) {
+      const reason = data?.status === 'incomplete'
+        ? data.incomplete_details?.reason === 'max_output_tokens' ? 'output_limit' : 'incomplete'
+        : 'response_invalid'
+      throw new CopilotOpenAIError('provider_failed', reason)
+    }
     const parts = data.output.filter((item: { type?: string }) => item.type === 'message')
       .flatMap((item: { content?: unknown[] }) => Array.isArray(item.content) ? item.content : [])
-    if (parts.some((part: { type?: string }) => part.type === 'refusal')) throw new CopilotOpenAIError('provider_failed')
+    if (parts.some((part: { type?: string }) => part.type === 'refusal')) throw new CopilotOpenAIError('provider_failed', 'refusal')
     const text = parts.filter((part: { type?: string; text?: unknown }) => part.type === 'output_text' && typeof part.text === 'string')
       .map((part: { text: string }) => part.text).join('').trim()
-    if (!text) throw new CopilotOpenAIError('provider_failed')
+    if (!text) throw new CopilotOpenAIError('provider_failed', 'empty_output')
     return { text, model: 'gpt-6-luna', provider: 'openai' as const,
       promptTokens: whole(data.usage?.input_tokens), outputTokens: whole(data.usage?.output_tokens) }
   })
@@ -81,7 +112,7 @@ export async function speakOpenAI(text: string) {
   }, async (response) => {
     const bytes = Buffer.from(await response.arrayBuffer())
     if (bytes.length < 44 || bytes.length > 32_000_000 || bytes.subarray(0, 4).toString() !== 'RIFF'
-      || bytes.subarray(8, 12).toString() !== 'WAVE') throw new CopilotOpenAIError('provider_failed')
+      || bytes.subarray(8, 12).toString() !== 'WAVE') throw new CopilotOpenAIError('provider_failed', 'invalid_audio')
     return { audio: bytes.toString('base64'), mime: 'audio/wav' }
   })
 }

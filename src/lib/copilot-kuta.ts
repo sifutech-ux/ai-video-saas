@@ -21,18 +21,20 @@ const MUKTAMAD = '/api/akaun/copilot/kuota/muktamad'
 
 export type KuotaReply = CopilotReply
 
+export type KuotaFailure = { ok: false; status: number; ralat: string; retryable?: true }
+
 export type KuotaRezab =
   | { ok: true; status: 'reserved'; rezabId: string }
   | { ok: true; status: 'settled'; rezabId: string; mainSemula: true; reply: KuotaReply }
-  | { ok: false; status: number; ralat: string }
+  | KuotaFailure
 
 export type KuotaHantar =
   | { ok: true; status: 'sending'; rezabId: string }
-  | { ok: false; status: number; ralat: string }
+  | KuotaFailure
 
 export type KuotaMuktamad =
   | { ok: true; status: string }
-  | { ok: false; status: number; ralat: string }
+  | KuotaFailure
 
 export type KuotaClient = {
   rezab(input: {
@@ -113,30 +115,41 @@ export function copilotSignature(secret: string, method: string, path: string, b
   return createHmac('sha256', secret).update(signed).digest('hex')
 }
 
-export function mapKuotaFailure(status: number, ralat: string) {
+export function mapKuotaFailure(status: number, ralat: string, retryable = false): {
+  status: number; error: string; ralat: string; retryable?: true
+} {
   if (ralat === 'had' || status === 429) {
-    return { status: 429, error: 'Kuota nasihat penuh. Cuba lagi kemudian.' }
+    return { status: 429, ralat: 'had', error: 'Kuota nasihat penuh. Cuba lagi kemudian.' }
+  }
+  if (ralat === 'profil') {
+    return { status: 422, ralat, error: 'Lengkapkan profil perniagaan dahulu.' }
   }
   if (ralat === 'kunci_berbeza') {
-    return { status: 409, error: 'Kunci permintaan ini sudah digunakan.' }
+    return { status: 409, ralat, error: 'Kunci permintaan ini sudah digunakan.' }
   }
   if (ralat === 'menunggu' || status === 409) {
-    return { status: 409, error: 'Permintaan ini masih diproses.' }
+    return { status: 409, ralat: 'menunggu', error: 'Permintaan ini masih diproses.' }
+  }
+  if (ralat === 'provider_failed') {
+    return {
+      status: 503, ralat, error: 'AI belum berjaya menyediakan jawapan. Anda boleh cuba menjana semula.',
+      ...(status === 503 && retryable === true ? { retryable: true as const } : {}),
+    }
   }
   if (ralat === 'tidak_pasti' || ralat === 'simpanan_tidak_pasti') {
-    return { status: 503, error: 'Keputusan permintaan ini belum pasti.' }
+    return { status: 503, ralat: 'tidak_pasti', error: 'Keputusan permintaan ini belum pasti.' }
   }
   if (ralat === 'litar') {
-    return { status: 503, error: 'Nasihat ditutup sebentar.' }
+    return { status: 503, ralat, error: 'Nasihat ditutup sebentar.' }
   }
-  return { status: 503, error: 'Akaun tidak dapat dihubungi. Cuba semula.' }
+  return { status: 503, ralat: 'kuota_tidak_sedia', error: 'Akaun tidak dapat dihubungi. Cuba semula.' }
 }
 
 function bytes(value: unknown) {
   return new TextEncoder().encode(JSON.stringify(value))
 }
 
-function failure(status = 503, ralat = 'kuota_tidak_sedia'): { ok: false; status: number; ralat: string } {
+function failure(status = 503, ralat = 'kuota_tidak_sedia'): KuotaFailure {
   return { ok: false, status, ralat }
 }
 
@@ -188,7 +201,10 @@ export function createKuotaClient(options: {
 
   function ralat(status: number, data: Record<string, unknown> | null) {
     const code = data && typeof data.ralat === 'string' ? data.ralat : 'kuota_tidak_sedia'
-    return failure(status || 503, code)
+    return {
+      ...failure(status || 503, code),
+      ...(status === 503 && code === 'provider_failed' && data?.ok === false && data.retryable === true ? { retryable: true as const } : {}),
+    }
   }
 
   return {
@@ -238,7 +254,8 @@ export function createKuotaClient(options: {
       }
       const { status, data } = await post(MUKTAMAD, payload)
       if (!data || data.ok !== true) return ralat(status, data)
-      return { ok: true, status: typeof data.status === 'string' ? data.status : input.hasil }
+      if (status < 200 || status >= 300 || data.status !== input.hasil) return failure(503, 'simpanan_tidak_pasti')
+      return { ok: true, status: input.hasil }
     },
   }
 }
