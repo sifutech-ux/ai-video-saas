@@ -38,6 +38,11 @@ export function copilotOpenAIKey() {
   return process.env.COPILOT_OPENAI_API_KEY?.trim() || ''
 }
 
+export function marketingOpenAIKey() {
+  // Marketing has its own credential; never fall back to Copilot or Studio.
+  return process.env.MARKETING_OPENAI_API_KEY?.trim() || ''
+}
+
 const schema = {
   type: 'object', additionalProperties: false,
   properties: {
@@ -51,8 +56,7 @@ function whole(value: unknown) {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null
 }
 
-async function request<T>(path: string, body: unknown, read: (response: Response) => Promise<T>): Promise<T> {
-  const key = copilotOpenAIKey()
+async function request<T>(key: string, path: string, body: unknown, read: (response: Response) => Promise<T>): Promise<T> {
   if (!key) throw new CopilotOpenAIError('provider_failed')
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 22_000)
@@ -80,8 +84,9 @@ async function request<T>(path: string, body: unknown, read: (response: Response
   }
 }
 
-export async function askOpenAIOnce(prompt: string, enhanced = false) {
-  return request('responses', {
+// Only the server-owned wrappers below select credentials, never request data.
+async function askWithKey(key: string, prompt: string, enhanced: boolean) {
+  return request(key, 'responses', {
     model: 'gpt-6-luna', input: prompt, store: false,
     reasoning: { effort: 'low' },
     // Product contract: <=80 words plus three short actions. Includes reasoning tokens.
@@ -106,9 +111,17 @@ export async function askOpenAIOnce(prompt: string, enhanced = false) {
   })
 }
 
+export async function askOpenAIOnce(prompt: string, enhanced = false) {
+  return askWithKey(copilotOpenAIKey(), prompt, enhanced)
+}
+
+export async function askMarketingOpenAIOnce(prompt: string) {
+  return askWithKey(marketingOpenAIKey(), prompt, true)
+}
+
 export async function speakOpenAI(text: string) {
   // Existing buffered speech contract. Replace before Speech API shutdown on 2027-01-06.
-  return request('audio/speech', {
+  return request(copilotOpenAIKey(), 'audio/speech', {
     model: 'gpt-4o-mini-tts', voice: 'cedar', input: text,
     response_format: 'wav',
     instructions: 'Baca tepat teks yang diberi dalam Bahasa Melayu Malaysia. Suara tenang, mesra dan jelas. Jangan tambah ayat.',
