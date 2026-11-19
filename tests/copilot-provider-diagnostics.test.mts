@@ -41,6 +41,32 @@ test('unknown provider codes and non-JSON failure bodies never enter logs or cau
   assert.doesNotMatch(logs.join(' '), /private|synthetic-secret/)
 }))
 
+test('documented credit, spend, usage and capacity codes remain fixed safe classifications', () => isolated(async logs => {
+  const cases = [
+    ['credit_balance_exhausted', 429],
+    ['organization_usage_limit_exceeded', 429],
+    ['organization_spend_limit_exceeded', 429],
+    ['project_spend_limit_exceeded', 429],
+    ['slow_down', 429],
+    ['server_is_overloaded', 503],
+  ] as const
+  let calls = 0
+  for (const [code, status] of cases) {
+    globalThis.fetch = async () => {
+      calls++
+      return Response.json({ error: { code, message: 'private-billing-and-user-data',
+        type: 'private-error-type', param: 'private-request-field' }, raw: 'synthetic-secret-never-log' }, { status })
+    }
+    await assert.rejects(() => askOpenAIOnce('private-user-prompt'), (e: Error) => e.message === 'provider_failed')
+  }
+  assert.equal(calls, cases.length)
+  assert.deepEqual(logs.map(line => JSON.parse(line)), cases.map(([code, status]) => ({
+    event: 'copilot_provider_failure', provider: 'openai', kind: 'provider_failed',
+    reason: 'http_error', http_status: status, provider_code: code,
+  })))
+  assert.doesNotMatch(logs.join(' '), /private|synthetic-secret/)
+}))
+
 test('output budget exhaustion is distinguishable from transport uncertainty without accepting partial output', () => isolated(async logs => {
   let calls = 0
   globalThis.fetch = async () => {

@@ -21,7 +21,10 @@ export class CopilotOpenAIError extends Error {
 const providerCodes = new Set(['insufficient_quota', 'rate_limit_exceeded', 'invalid_api_key',
   'model_not_found', 'permission_denied', 'invalid_request_error', 'server_error',
   'context_length_exceeded', 'unsupported_parameter', 'invalid_json_schema',
-  'billing_hard_limit_reached', 'budget_exceeded', 'content_policy_violation'])
+  'billing_hard_limit_reached', 'budget_exceeded', 'content_policy_violation',
+  'credit_balance_exhausted', 'organization_usage_limit_exceeded',
+  'organization_spend_limit_exceeded', 'project_spend_limit_exceeded',
+  'slow_down', 'server_is_overloaded'])
 
 function recordFailure(error: CopilotOpenAIError) {
   console.warn(JSON.stringify({ event: 'copilot_provider_failure', provider: 'openai',
