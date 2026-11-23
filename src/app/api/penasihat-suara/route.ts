@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { originAllowed, tooManyNotes } from '@/lib/penasihat'
 import { speakAdvice } from '@/lib/penasihat-suara'
 import { copilotHeaders, fetchCopilotSession } from '@/lib/copilot-nasihat'
-import { speakOpenAI } from '@/lib/copilot-openai'
+import { speakCopilot } from '@/lib/copilot-elevenlabs'
 
 export const maxDuration = 60
 export const runtime = 'nodejs'
@@ -24,7 +24,8 @@ export async function POST(req: Request) {
   // The deployed Copilot account service authenticates speech before any paid call.
   // Legacy Studio installations without COPILOT_AKAUN_URL retain their existing route.
   const akaunUrl = process.env.COPILOT_AKAUN_URL
-  if (akaunUrl || process.env.COPILOT_AI_PROVIDER === 'openai') {
+  const copilot = Boolean(akaunUrl || process.env.COPILOT_AI_PROVIDER === 'openai')
+  if (copilot) {
     const authorization = req.headers.get('authorization') || ''
     if (!/^Bearer\s+\S{1,400}$/i.test(authorization)) {
       return NextResponse.json({ error: 'Sila masuk akaun dahulu.' }, { status: 401, headers })
@@ -56,11 +57,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const spoken = process.env.COPILOT_AI_PROVIDER === 'openai'
-      ? await speakOpenAI([jawapan, ...langkah.map((line, index) => `Langkah ${index + 1}. ${line}`)].join(' ').slice(0, 5500))
-      : await speakAdvice(jawapan, langkah, Boolean(akaunUrl))
+    const spoken = copilot
+      ? await speakCopilot([jawapan, ...langkah.map((line, index) => `Langkah ${index + 1}. ${line}`)].join(' ').slice(0, 5500), req.signal)
+      : await speakAdvice(jawapan, langkah, false)
     return NextResponse.json({ ok: true, ...spoken }, { headers })
-  } catch (error) {
+  } catch {
     console.warn('Suara penasihat tidak dijana.')
     return NextResponse.json(
       { error: 'Suara belum dapat didengar. Cuba sekali lagi, atau baca jawapan di skrin.' },

@@ -77,7 +77,10 @@ test('realtime uses server-selected model/context, multipart SDP and no exposed 
     assert.equal(url, 'https://api.openai.com/v1/realtime/calls')
     const data = init?.body as FormData
     assert.equal(data.get('sdp'), 'v=0\r\nfixture')
-    assert.equal(JSON.parse(String(data.get('session'))).audio.output.voice, 'cedar')
+    const configuration = JSON.parse(String(data.get('session')))
+    assert.deepEqual(configuration.output_modalities, ['text'])
+    assert.equal(configuration.audio.output, undefined)
+    assert.equal(configuration.audio.input.transcription.language, 'ms')
     return new Response('v=0\r\nanswer', { headers: { location: '/v1/realtime/calls/rtc_fixture' } })
   }
   try { assert.deepEqual(await createRealtimeCall('v=0\r\nfixture', profile, context), { sdp: 'v=0\r\nanswer', callId: 'rtc_fixture' }) }
