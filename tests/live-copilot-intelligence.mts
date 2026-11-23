@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { setTimeout as pause } from 'node:timers/promises'
 import { POST as advice } from '../src/app/api/copilot/bijak/route.ts'
 import { POST as voice } from '../src/app/api/copilot/suara/route.ts'
-import { speakOpenAI } from '../src/lib/copilot-openai.ts'
+import { POST as readAloud } from '../src/app/api/penasihat-suara/route.ts'
 
 assert.equal(process.env.COPILOT_LIVE_QA, 'synthetic-only')
 assert.equal(process.env.COPILOT_AKAUN_URL, 'https://copilot-qa.beshareaisolution.com')
@@ -51,6 +51,15 @@ async function ask(token: string, question: string, id = randomBytes(16).toStrin
   assert.equal(r.status, 200, JSON.stringify(body))
   assert.equal(body.bukan_model, false)
   assert.ok(['openai', 'tersimpan'].includes(body.sumber))
+  return body
+}
+async function speech(token: string, jawapan: string) {
+  const response = await readAloud(request('/api/penasihat-suara', { jawapan, langkah: [] }, token))
+  const body = await response.json()
+  assert.equal(response.status, 200, JSON.stringify({ error: body.error }))
+  assert.equal(body.audioProvider, 'elevenlabs')
+  assert.equal(body.mime, 'audio/mpeg')
+  assert.ok(Buffer.from(body.audio, 'base64').length > 64)
   return body
 }
 let tokenA = '', session = ''
@@ -108,7 +117,7 @@ try {
   assert.equal(empty.cadangan.length, 0)
   pass('Empty account response reviewed against absent records', empty.jawapan)
   console.log('COPILOT_LIVE_TEXT_RESULT', JSON.stringify({ checks, providerRequests }))
-  const audio = await speakOpenAI('Berapakah harga latte saya sekarang?')
+  const audio = await speech(tokenA, 'Berapakah harga latte saya sekarang?')
   console.log('COPILOT_AUDIO_FIXTURE', JSON.stringify(audio))
   console.log('COPILOT_VOICE_WAITING_FOR_OFFER_AND_MEDIA_READY')
   const deadline = Date.now() + 180000
@@ -128,9 +137,10 @@ try {
   while (!existsSync('/qa/shared/finish.json') && Date.now() < voiceDeadline) await pause(1000)
   assert.ok(existsSync('/qa/shared/finish.json'), 'Browser media acceptance not completed')
   const browser = JSON.parse(readFileSync('/qa/shared/finish.json', 'utf8'))
-  assert.equal(browser.connected, true); assert.ok(browser.bytesReceived > 0)
+  assert.equal(browser.connected, true)
   assert.ok(browser.inputTranscript); assert.ok(browser.outputTranscript)
-  pass('Browser WebRTC synthetic speech input and generated audio output', browser)
+  await speech(tokenA, browser.outputTranscript)
+  pass('Browser WebRTC synthetic speech input and ElevenLabs synthesis of the reply', browser)
 } catch (error) {
   process.exitCode = 1
   console.log('COPILOT_LIVE_ERROR', JSON.stringify({ message: error instanceof Error ? error.message : 'Unknown error' }))

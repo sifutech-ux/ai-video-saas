@@ -21,6 +21,7 @@ test('realtime reserves a persistent allowance, blocks duplicate session, and bi
   process.env.COPILOT_AKAUN_URL = 'https://akaun.beshareaisolution.com'
   process.env.COPILOT_AKAUN_HOST = 'akaun.beshareaisolution.com'
   process.env.COPILOT_OPENAI_API_KEY = 'synthetic-fixture-key'
+  process.env.COPILOT_ELEVENLABS_API_KEY = 'synthetic-elevenlabs-key'
   process.env.COPILOT_REALTIME_ENABLED = 'true'
   globalThis.fetch = async (target, init) => {
     const path = String(target); calls.push(path)
@@ -33,18 +34,23 @@ test('realtime reserves a persistent allowance, blocks duplicate session, and bi
     throw new Error('Unexpected endpoint')
   }
   try {
-    const result = await POST(request({ sdp: 'v=0\r\noffer', model: 'attacker-model' }))
+    assert.equal((await POST(request({ sdp: 'v=0\r\noffer' }))).status, 409)
+    assert.equal(calls.filter(x => x.endsWith('/suara/rezab')).length, 0)
+    const offer = { sdp: 'v=0\r\noffer', audioProvider: 'elevenlabs' }
+    const result = await POST(request({ ...offer, model: 'attacker-model' }))
     const body = await result.json()
     assert.equal(result.status, 200, JSON.stringify(body)); assert.equal(body.had_saat, 300)
+    assert.equal(body.audioProvider, 'elevenlabs')
     assert.ok(!JSON.stringify(body).includes('synthetic-fixture-key'))
+    assert.ok(!JSON.stringify(body).includes('synthetic-elevenlabs-key'))
     assert.ok(calls.find(x => x.endsWith('/suara/rezab')))
-    assert.equal((await POST(request({ sdp: 'v=0\r\noffer' }))).status, 429)
+    assert.equal((await POST(request(offer))).status, 429)
     assert.equal((await POST(request({ henti: body.sesi }, 'fixture-b'))).status, 404)
     assert.equal((await POST(request({ henti: body.sesi }))).status, 200)
     assert.equal(calls.filter(x => x.endsWith('/realtime/calls')).length, 1)
   } finally {
     globalThis.fetch = old
-    for (const name of ['COPILOT_AKAUN_URL', 'COPILOT_AKAUN_HOST', 'COPILOT_OPENAI_API_KEY', 'COPILOT_REALTIME_ENABLED']) {
+    for (const name of ['COPILOT_AKAUN_URL', 'COPILOT_AKAUN_HOST', 'COPILOT_OPENAI_API_KEY', 'COPILOT_ELEVENLABS_API_KEY', 'COPILOT_REALTIME_ENABLED']) {
       if (env[name] === undefined) delete process.env[name]; else process.env[name] = env[name]
     }
   }

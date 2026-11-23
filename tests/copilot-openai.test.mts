@@ -8,7 +8,7 @@ import { POST as advice } from '../src/app/api/copilot/nasihat/route.ts'
 const answer = { jawapan: 'Uji satu tawaran kopi untuk pekerja pejabat.', langkah: ['Pilih satu produk.', 'Tanya lima pelanggan.', 'Catat respons mereka.'] }
 const result = () => ({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(answer) }] }], usage: { input_tokens: 100, output_tokens: 60 } })
 const session = () => ({ ok: true, akaun_id: 'a'.repeat(32), exp: Math.floor(Date.now()/1000) + 3600, penasihat: { nama: 'Kedai Kopi Ujian', jualan: 'Kopi untuk pekerja pejabat', peringkat: 'mula' } })
-const envNames = ['COPILOT_AI_PROVIDER','COPILOT_OPENAI_API_KEY','OPENAI_API_KEY','COPILOT_AKAUN_URL','COPILOT_AKAUN_HOST','COPILOT_KUTA_SECRET'] as const
+const envNames = ['COPILOT_AI_PROVIDER','COPILOT_OPENAI_API_KEY','OPENAI_API_KEY','COPILOT_ELEVENLABS_API_KEY','COPILOT_AKAUN_URL','COPILOT_AKAUN_HOST','COPILOT_KUTA_SECRET'] as const
 async function isolated(fn: () => Promise<void>) {
   const env = Object.fromEntries(envNames.map(k => [k, process.env[k]]))
   const originalFetch = globalThis.fetch
@@ -110,26 +110,32 @@ test('OpenAI advice traverses session, quota, provider and settlement; replay ca
   assert.deepEqual(calls.map(x => x.split('/').at(-1)), ['sesi','rezab'])
 }))
 
-test('speech requires valid account before generating WAV and accepts authenticated CORS', () => isolated(async () => {
-  const bytes = Buffer.alloc(2000); bytes.write('RIFF'); bytes.write('WAVE', 8)
+test('Copilot speech requires a valid account and reads Malay with Ashraf via ElevenLabs', () => isolated(async () => {
+  const bytes = Buffer.alloc(2000); bytes.write('ID3')
   let paid = 0
+  delete process.env.COPILOT_ELEVENLABS_API_KEY
   globalThis.fetch = async (url, options) => {
     if (String(url).endsWith('/sesi')) return Response.json(session())
-    assert.equal(url, 'https://api.openai.com/v1/audio/speech')
+    assert.equal(String(url), 'https://api.elevenlabs.io/v1/text-to-speech/NHFTLozDZneDWyQjRGAO?output_format=mp3_44100_128')
+    assert.equal(new Headers(options?.headers).get('xi-api-key'), 'synthetic-elevenlabs')
     const body = JSON.parse(options?.body as string)
-    assert.equal(body.voice, 'cedar')
-    assert.ok(body.input.includes(answer.jawapan))
+    assert.equal(body.model_id, 'eleven_v4')
+    assert.equal(body.language_code, 'ms')
+    assert.ok(body.text.includes(answer.jawapan))
     paid++
-    return new Response(bytes, { headers: { 'content-type':'audio/wav' } })
+    return new Response(bytes, { headers: { 'content-type':'audio/mpeg' } })
   }
   const req = (token = '') => new Request('https://nasihat.beshareaisolution.com/api/penasihat-suara', { method: 'POST', headers: { origin:'https://beshareaisolution.com', authorization:token, 'content-type':'application/json', 'x-forwarded-for':'203.0.113.91' }, body:JSON.stringify(answer) })
   assert.equal((await voice(req())).status, 401)
+  assert.equal((await voice(req('Bearer synthetic-token'))).status, 503)
   assert.equal(paid, 0)
+  process.env.COPILOT_ELEVENLABS_API_KEY = 'synthetic-elevenlabs'
   const response = await voice(req('Bearer synthetic-token'))
   assert.equal(response.status, 200)
   const body = await response.json()
   assert.deepEqual(Buffer.from(body.audio,'base64'), bytes)
-  assert.equal(body.mime, 'audio/wav')
+  assert.equal(body.mime, 'audio/mpeg')
+  assert.equal(body.audioProvider, 'elevenlabs')
   assert.equal(paid, 1)
   const preflight = await voiceOptions(new Request('https://nasihat.beshareaisolution.com/api/penasihat-suara', { headers:{origin:'https://beshareaisolution.com'} }))
   assert.match(preflight.headers.get('access-control-allow-headers') || '', /Authorization/)

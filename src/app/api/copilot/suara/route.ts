@@ -3,6 +3,7 @@ import { copilotHeaders, fetchCopilotSession } from '@/lib/copilot-nasihat'
 import { originAllowed, tooManyNotes } from '@/lib/penasihat'
 import { accountRequest, fetchBusinessContext } from '@/lib/copilot-intelligence'
 import { copilotOpenAIKey } from '@/lib/copilot-openai'
+import { copilotElevenLabsKey } from '@/lib/copilot-elevenlabs'
 import { createRealtimeCall, hangupRealtime } from '@/lib/copilot-realtime'
 
 export const runtime = 'nodejs'
@@ -40,7 +41,8 @@ export async function POST(req: Request) {
   }
   if (!session.penasihat) return json({ error: 'Lengkapkan profil dahulu.' }, 422)
   if (typeof body?.sdp !== 'string' || !body.sdp.startsWith('v=0') || body.sdp.length > 40000) return json({ error: 'Sambungan suara tidak sah.' }, 400)
-  if (process.env.COPILOT_REALTIME_ENABLED !== 'true') return json({ error: 'Perbualan suara sedang disediakan.' }, 503)
+  if (body.audioProvider !== 'elevenlabs') return json({ error: 'Muat semula Copilot untuk menggunakan suara baharu.' }, 409)
+  if (process.env.COPILOT_REALTIME_ENABLED !== 'true' || !copilotElevenLabsKey()) return json({ error: 'Perbualan suara sedang disediakan.' }, 503)
   if (pending.has(session.akaunId) || [...calls.values()].some(c => c.owner === session.akaunId)
     || tooManyNotes(`realtime:${session.akaunId}`)) return json({ error: 'Tamatkan sesi suara sebelum membuka sesi baharu.' }, 429)
   pending.add(session.akaunId)
@@ -55,7 +57,7 @@ export async function POST(req: Request) {
     }, 300000)
     timer.unref()
     calls.set(id, { owner: session.akaunId, callId: call.callId, timer })
-    return json({ ok: true, sdp: call.sdp, sesi: id, had_saat: 300 })
+    return json({ ok: true, sdp: call.sdp, sesi: id, had_saat: 300, audioProvider: 'elevenlabs' })
   } catch (error) {
     return json({ error: error instanceof Error && error.message === 'voice_limit'
       ? 'Had sesi suara hari ini telah digunakan.' : 'Suara belum dapat disambungkan. Cuba lagi kemudian.' },
